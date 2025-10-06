@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { db } from '../lib/supabase'
 import CreateModel from './CreateModel'
+import ViewModels from './ViewModels'
 
 const Dashboard: React.FC = () => {
   const { user, signOut } = useAuth()
   const [hasModels, setHasModels] = useState(false)
   const [modelsCount, setModelsCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'dress-model'>('dashboard')
+  const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'dress-model' | 'view-models'>('dashboard')
 
   const checkUserModels = async () => {
     if (user) {
@@ -54,6 +55,10 @@ const Dashboard: React.FC = () => {
 
   if (currentView === 'create-model') {
     return <CreateModel onBack={() => setCurrentView('dashboard')} />
+  }
+
+  if (currentView === 'view-models') {
+    return <ViewModels onBack={() => setCurrentView('dashboard')} />
   }
 
   return (
@@ -134,6 +139,15 @@ const Dashboard: React.FC = () => {
                 <div className="stat-value">0</div>
                 <div className="stat-label">Dressed Models</div>
               </div>
+            </div>
+            <div style={{textAlign: 'center', marginTop: '20px'}}>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => setCurrentView('view-models')}
+                style={{width: 'auto', padding: '12px 32px'}}
+              >
+                View All Models
+              </button>
             </div>
           </div>
         )}

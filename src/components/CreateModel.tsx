@@ -45,7 +45,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
         aspectRatio: '9:16'
       })
       
-      const mockModel = {
+      const aiModel = {
         id: Date.now().toString(),
         imageUrl: imageUrl,
         type: 'ai_generated',
@@ -53,7 +53,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
         createdAt: new Date().toISOString()
       }
       
-      setGeneratedModel(mockModel)
+      setGeneratedModel(aiModel)
       setSuccess(true)
     } catch (err: any) {
       setError(err.message || 'Failed to generate AI model. Please try again.')
@@ -120,6 +120,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
           model_image_url: generatedModel.imageUrl,
           model_data: {
             type: generatedModel.type,
+            prompt: generatedModel.prompt || null,
             created_at: generatedModel.createdAt
           },
           status: 'completed'
