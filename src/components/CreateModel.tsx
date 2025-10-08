@@ -28,6 +28,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
   const [hairColor, setHairColor] = useState('Brown')
   const [eyeColor, setEyeColor] = useState('Brown')
   const [hasBeard, setHasBeard] = useState(false)
+  const [shotType, setShotType] = useState<'full-body' | 'close-up'>('full-body')
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -50,7 +51,11 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
       
       const beardDescription = gender === 'male' && hasBeard ? 'with beard' : ''
       
-      const constructedPrompt = `A professional fashion model, ${gender}, ${height} tall, ${weight}, ${ethnicity} ethnicity, ${hairColor} hair, ${eyeColor} eyes ${beardDescription}, ${swimwearDescription}. Full body shot, professional studio lighting, neutral background, editorial fashion photography style, photorealistic, high resolution.`
+      const shotDescription = shotType === 'close-up' 
+        ? 'Close-up portrait shot focusing on face and upper body'
+        : 'Full body shot from head to toe'
+      
+      const constructedPrompt = `A professional fashion model, ${gender}, ${height} tall, ${weight}, ${ethnicity} ethnicity, ${hairColor} hair, ${eyeColor} eyes ${beardDescription}, ${swimwearDescription}. ${shotDescription}, professional studio lighting, neutral background, editorial fashion photography style, photorealistic, high resolution.`
       
       console.log('Generated prompt:', constructedPrompt)
       
@@ -347,12 +352,28 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                       </select>
                     </div>
                   )}
+
+                  <div className="form-group">
+                    <label htmlFor="shot-type" className="form-label">Shot Type</label>
+                    <select
+                      id="shot-type"
+                      className="form-input"
+                      value={shotType}
+                      onChange={(e) => setShotType(e.target.value as 'full-body' | 'close-up')}
+                    >
+                      <option value="full-body">Full Body (Head to Toe)</option>
+                      <option value="close-up">Close-Up (Face & Upper Body)</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div style={{padding: '15px', background: '#ebf8ff', borderRadius: '8px', marginBottom: '20px'}}>
-                  <p style={{margin: 0, fontSize: '13px', color: '#2c5282'}}>
-                    ℹ️ <strong>Note:</strong> The model will be generated wearing black swimwear - 
+                  <p style={{margin: 0, fontSize: '13px', color: '#2c5282', marginBottom: '8px'}}>
+                    ℹ️ <strong>Swimwear:</strong> The model will be wearing black swimwear - 
                     {gender === 'female' ? ' a black strapless bandeau bikini' : ' black swim shorts'}.
+                  </p>
+                  <p style={{margin: 0, fontSize: '13px', color: '#2c5282'}}>
+                    📸 <strong>Shot Type:</strong> {shotType === 'full-body' ? 'Full body from head to toe' : 'Close-up portrait (face and upper body)'}.
                   </p>
                 </div>
                 
