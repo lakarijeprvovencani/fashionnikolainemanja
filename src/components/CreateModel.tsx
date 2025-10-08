@@ -272,7 +272,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                       <option value="Asian">🌏 Asian</option>
                       <option value="Hispanic">🌎 Hispanic</option>
                       <option value="Middle Eastern">🏜️ Middle Eastern</option>
-                      <option value="Mixed">🌈 Mixed</option>
+                      <option value="Mixed">🌐 Mixed</option>
                     </select>
                   </div>
 
