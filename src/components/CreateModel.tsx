@@ -5,9 +5,10 @@ import { generateFashionModel, generateModelFromUploadedImage } from '../lib/gem
 
 interface CreateModelProps {
   onBack?: () => void
+  onViewModels?: () => void
 }
 
-const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
+const CreateModel: React.FC<CreateModelProps> = ({ onBack, onViewModels }) => {
   const { user } = useAuth()
   const [selectedOption, setSelectedOption] = useState<'ai' | 'upload' | null>(null)
   const [modelName, setModelName] = useState('')
@@ -160,10 +161,10 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
       setSuccess(true)
       setError('')
       
-      // Refresh dashboard after 2 seconds
+      // Navigate to View Models after 2 seconds
       setTimeout(() => {
-        if (onBack) {
-          onBack()
+        if (onViewModels) {
+          onViewModels()
         }
       }, 2000)
     } catch (err) {
@@ -323,7 +324,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                   </div>
 
                   {gender === 'male' && (
-                    <div className="form-group">
+                <div className="form-group">
                       <label htmlFor="beard" className="form-label">🧔 Beard</label>
                       <select
                         id="beard"
@@ -555,11 +556,11 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                       Supported formats: JPG, PNG, GIF, WEBP
                     </p>
                     
-                    <input
-                      id="photo-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
+                  <input
+                    id="photo-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
                       style={{display: 'none'}}
                     />
                   </div>
@@ -604,8 +605,8 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                         background: 'linear-gradient(90deg, #764ba2 0%, #667eea 100%)',
                         borderRadius: '2px'
                       }}></div>
-                    </div>
-                    
+                </div>
+
                     <div style={{
                       textAlign: 'center',
                       position: 'relative'
@@ -622,10 +623,10 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                         backgroundOrigin: 'border-box',
                         backgroundClip: 'padding-box, border-box'
                       }}>
-                        <img 
-                          src={previewUrl} 
+                    <img 
+                      src={previewUrl} 
                           alt="Model Preview" 
-                          style={{
+                      style={{
                             maxWidth: '350px',
                             maxHeight: '500px',
                             width: '100%',

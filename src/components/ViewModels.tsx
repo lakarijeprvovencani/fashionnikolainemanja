@@ -283,17 +283,50 @@ const ViewModels: React.FC<ViewModelsProps> = ({ onBack, onSelectModel }) => {
                   </h3>
                   
                   <p style={{
-                    margin: '0',
+                    margin: '0 0 12px 0',
                     fontSize: '12px',
                     color: '#718096'
                   }}>
                     {new Date(model.created_at).toLocaleDateString('sr-RS')}
                   </p>
 
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // For now just show alert, will be used for "Dress Model" later
+                      alert(`Use This Model feature coming soon!\nModel: ${model.model_name}`)
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+                      marginBottom: '8px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.5)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)'
+                    }}
+                  >
+                    👗 Use This Model
+                  </button>
+
                   {model.model_data?.type && (
                     <span style={{
                       display: 'inline-block',
-                      marginTop: '8px',
                       padding: '4px 8px',
                       background: model.model_data.type === 'ai_generated' ? '#ebf8ff' : '#f0fff4',
                       color: model.model_data.type === 'ai_generated' ? '#2b6cb0' : '#276749',

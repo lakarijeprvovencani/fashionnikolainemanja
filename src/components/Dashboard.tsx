@@ -54,7 +54,10 @@ const Dashboard: React.FC = () => {
   }
 
   if (currentView === 'create-model') {
-    return <CreateModel onBack={() => setCurrentView('dashboard')} />
+    return <CreateModel 
+      onBack={() => setCurrentView('dashboard')} 
+      onViewModels={() => setCurrentView('view-models')}
+    />
   }
 
   if (currentView === 'view-models') {
