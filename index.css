@@ -126,6 +126,39 @@ body {
   color: #a0aec0;
 }
 
+/* Custom Select Dropdown */
+.custom-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23667eea' d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 40px;
+  cursor: pointer;
+  font-weight: 500;
+  color: #2d3748;
+}
+
+.custom-select:hover {
+  border-color: #667eea;
+  background-color: #f7fafc;
+}
+
+.custom-select:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+  background-color: #ffffff;
+}
+
+.custom-select option {
+  padding: 12px;
+  background: white;
+  color: #2d3748;
+  font-weight: 500;
+}
+
 /* Buttons */
 .btn {
   width: 100%;

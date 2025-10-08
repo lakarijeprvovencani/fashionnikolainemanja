@@ -28,7 +28,6 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
   const [hairColor, setHairColor] = useState('Brown')
   const [eyeColor, setEyeColor] = useState('Brown')
   const [hasBeard, setHasBeard] = useState(false)
-  const [shotType, setShotType] = useState<'full-body' | 'close-up'>('full-body')
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -51,11 +50,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
       
       const beardDescription = gender === 'male' && hasBeard ? 'with beard' : ''
       
-      const shotDescription = shotType === 'close-up' 
-        ? 'Close-up portrait shot focusing on face and upper body'
-        : 'Full body shot from head to toe'
-      
-      const constructedPrompt = `A professional fashion model, ${gender}, ${height} tall, ${weight}, ${ethnicity} ethnicity, ${hairColor} hair, ${eyeColor} eyes ${beardDescription}, ${swimwearDescription}. ${shotDescription}, professional studio lighting, neutral background, editorial fashion photography style, photorealistic, high resolution.`
+      const constructedPrompt = `A professional fashion model, ${gender}, ${height} tall, ${weight}, ${ethnicity} ethnicity, ${hairColor} hair, ${eyeColor} eyes ${beardDescription}, ${swimwearDescription}. Show the full-body view of the model from head to toes, with feet fully visible, professional studio lighting, neutral background, editorial fashion photography style, photorealistic, high resolution.`
       
       console.log('Generated prompt:', constructedPrompt)
       
@@ -239,7 +234,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                     <label htmlFor="gender" className="form-label">Gender</label>
                     <select
                       id="gender"
-                      className="form-input"
+                      className="form-input custom-select"
                       value={gender}
                       onChange={(e) => setGender(e.target.value as 'male' | 'female')}
                     >
@@ -252,7 +247,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                     <label htmlFor="height" className="form-label">Height</label>
                     <select
                       id="height"
-                      className="form-input"
+                      className="form-input custom-select"
                       value={height}
                       onChange={(e) => setHeight(e.target.value)}
                     >
@@ -270,7 +265,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                     <label htmlFor="weight" className="form-label">Weight</label>
                     <select
                       id="weight"
-                      className="form-input"
+                      className="form-input custom-select"
                       value={weight}
                       onChange={(e) => setWeight(e.target.value)}
                     >
@@ -290,7 +285,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                     <label htmlFor="ethnicity" className="form-label">Ethnicity</label>
                     <select
                       id="ethnicity"
-                      className="form-input"
+                      className="form-input custom-select"
                       value={ethnicity}
                       onChange={(e) => setEthnicity(e.target.value)}
                     >
@@ -307,7 +302,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                     <label htmlFor="hair-color" className="form-label">Hair Color</label>
                     <select
                       id="hair-color"
-                      className="form-input"
+                      className="form-input custom-select"
                       value={hairColor}
                       onChange={(e) => setHairColor(e.target.value)}
                     >
@@ -325,7 +320,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                     <label htmlFor="eye-color" className="form-label">Eye Color</label>
                     <select
                       id="eye-color"
-                      className="form-input"
+                      className="form-input custom-select"
                       value={eyeColor}
                       onChange={(e) => setEyeColor(e.target.value)}
                     >
@@ -343,7 +338,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                       <label htmlFor="beard" className="form-label">Beard</label>
                       <select
                         id="beard"
-                        className="form-input"
+                        className="form-input custom-select"
                         value={hasBeard ? 'yes' : 'no'}
                         onChange={(e) => setHasBeard(e.target.value === 'yes')}
                       >
@@ -352,28 +347,12 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                       </select>
                     </div>
                   )}
-
-                  <div className="form-group">
-                    <label htmlFor="shot-type" className="form-label">Shot Type</label>
-                    <select
-                      id="shot-type"
-                      className="form-input"
-                      value={shotType}
-                      onChange={(e) => setShotType(e.target.value as 'full-body' | 'close-up')}
-                    >
-                      <option value="full-body">Full Body (Head to Toe)</option>
-                      <option value="close-up">Close-Up (Face & Upper Body)</option>
-                    </select>
-                  </div>
                 </div>
 
                 <div style={{padding: '15px', background: '#ebf8ff', borderRadius: '8px', marginBottom: '20px'}}>
-                  <p style={{margin: 0, fontSize: '13px', color: '#2c5282', marginBottom: '8px'}}>
-                    ℹ️ <strong>Swimwear:</strong> The model will be wearing black swimwear - 
-                    {gender === 'female' ? ' a black strapless bandeau bikini' : ' black swim shorts'}.
-                  </p>
                   <p style={{margin: 0, fontSize: '13px', color: '#2c5282'}}>
-                    📸 <strong>Shot Type:</strong> {shotType === 'full-body' ? 'Full body from head to toe' : 'Close-up portrait (face and upper body)'}.
+                    ℹ️ <strong>Note:</strong> The model will be generated wearing black swimwear - 
+                    {gender === 'female' ? ' a black strapless bandeau bikini' : ' black swim shorts'}, full body view with feet visible.
                   </p>
                 </div>
                 
