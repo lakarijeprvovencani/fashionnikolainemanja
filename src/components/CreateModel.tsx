@@ -19,6 +19,15 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
   const [uploadedImage, setUploadedImage] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [imageAnalysis, setImageAnalysis] = useState<string>('')
+  
+  // Model parameters
+  const [gender, setGender] = useState<'male' | 'female'>('female')
+  const [height, setHeight] = useState('175cm')
+  const [weight, setWeight] = useState('65kg')
+  const [ethnicity, setEthnicity] = useState('Caucasian')
+  const [hairColor, setHairColor] = useState('Brown')
+  const [eyeColor, setEyeColor] = useState('Brown')
+  const [hasBeard, setHasBeard] = useState(false)
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -30,18 +39,24 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
   }
 
   const generateAIModel = async () => {
-    if (!prompt.trim()) {
-      setError('Please enter a description for your model')
-      return
-    }
-    
     setLoading(true)
     setError('')
     
     try {
+      // Build prompt from selected parameters
+      const swimwearDescription = gender === 'female' 
+        ? 'wearing a black strapless bandeau bikini (two-piece swimsuit without straps)'
+        : 'wearing black swim shorts (bare chest)'
+      
+      const beardDescription = gender === 'male' && hasBeard ? 'with beard' : ''
+      
+      const constructedPrompt = `A professional fashion model, ${gender}, ${height} tall, ${weight}, ${ethnicity} ethnicity, ${hairColor} hair, ${eyeColor} eyes ${beardDescription}, ${swimwearDescription}. Full body shot, professional studio lighting, neutral background, editorial fashion photography style, photorealistic, high resolution.`
+      
+      console.log('Generated prompt:', constructedPrompt)
+      
       // Korišćenje Gemini API-ja za generisanje modela
       const imageUrl = await generateFashionModel({
-        prompt: prompt,
+        prompt: constructedPrompt,
         aspectRatio: '9:16'
       })
       
@@ -49,7 +64,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
         id: Date.now().toString(),
         imageUrl: imageUrl,
         type: 'ai_generated',
-        prompt: prompt,
+        prompt: constructedPrompt,
         createdAt: new Date().toISOString()
       }
       
@@ -211,22 +226,133 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
               <div className="welcome-card">
                 <h2>Generate AI Model</h2>
                 <p style={{marginBottom: '20px', color: '#718096'}}>
-                  Describe the type of fashion model you want to create. Be specific about features, style, pose, and appearance.
+                  Select the characteristics for your fashion model. The model will be generated in black swimwear.
                 </p>
                 
-                <div className="form-group">
-                  <label htmlFor="model-prompt" className="form-label">Model Description</label>
-                  <textarea
-                    id="model-prompt"
-                    className="form-input"
-                    placeholder="e.g., A tall female model with long dark hair, wearing elegant pose, professional studio lighting, modern fashion style..."
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    rows={4}
-                    style={{resize: 'vertical', minHeight: '100px'}}
-                  />
-                  <p style={{fontSize: '12px', color: '#a0aec0', marginTop: '5px'}}>
-                    💡 Tip: The more detailed your description, the better the results!
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '20px'}}>
+                  <div className="form-group">
+                    <label htmlFor="gender" className="form-label">Gender</label>
+                    <select
+                      id="gender"
+                      className="form-input"
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value as 'male' | 'female')}
+                    >
+                      <option value="female">Female</option>
+                      <option value="male">Male</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="height" className="form-label">Height</label>
+                    <select
+                      id="height"
+                      className="form-input"
+                      value={height}
+                      onChange={(e) => setHeight(e.target.value)}
+                    >
+                      <option value="160cm">160cm (5'3")</option>
+                      <option value="165cm">165cm (5'5")</option>
+                      <option value="170cm">170cm (5'7")</option>
+                      <option value="175cm">175cm (5'9")</option>
+                      <option value="180cm">180cm (5'11")</option>
+                      <option value="185cm">185cm (6'1")</option>
+                      <option value="190cm">190cm (6'3")</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="weight" className="form-label">Weight</label>
+                    <select
+                      id="weight"
+                      className="form-input"
+                      value={weight}
+                      onChange={(e) => setWeight(e.target.value)}
+                    >
+                      <option value="50kg">50kg (110 lbs)</option>
+                      <option value="55kg">55kg (121 lbs)</option>
+                      <option value="60kg">60kg (132 lbs)</option>
+                      <option value="65kg">65kg (143 lbs)</option>
+                      <option value="70kg">70kg (154 lbs)</option>
+                      <option value="75kg">75kg (165 lbs)</option>
+                      <option value="80kg">80kg (176 lbs)</option>
+                      <option value="85kg">85kg (187 lbs)</option>
+                      <option value="90kg">90kg (198 lbs)</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="ethnicity" className="form-label">Ethnicity</label>
+                    <select
+                      id="ethnicity"
+                      className="form-input"
+                      value={ethnicity}
+                      onChange={(e) => setEthnicity(e.target.value)}
+                    >
+                      <option value="Caucasian">Caucasian</option>
+                      <option value="African">African</option>
+                      <option value="Asian">Asian</option>
+                      <option value="Hispanic">Hispanic</option>
+                      <option value="Middle Eastern">Middle Eastern</option>
+                      <option value="Mixed">Mixed</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="hair-color" className="form-label">Hair Color</label>
+                    <select
+                      id="hair-color"
+                      className="form-input"
+                      value={hairColor}
+                      onChange={(e) => setHairColor(e.target.value)}
+                    >
+                      <option value="Black">Black</option>
+                      <option value="Brown">Brown</option>
+                      <option value="Blonde">Blonde</option>
+                      <option value="Red">Red</option>
+                      <option value="Auburn">Auburn</option>
+                      <option value="Gray">Gray</option>
+                      <option value="White">White</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="eye-color" className="form-label">Eye Color</label>
+                    <select
+                      id="eye-color"
+                      className="form-input"
+                      value={eyeColor}
+                      onChange={(e) => setEyeColor(e.target.value)}
+                    >
+                      <option value="Brown">Brown</option>
+                      <option value="Blue">Blue</option>
+                      <option value="Green">Green</option>
+                      <option value="Hazel">Hazel</option>
+                      <option value="Gray">Gray</option>
+                      <option value="Amber">Amber</option>
+                    </select>
+                  </div>
+
+                  {gender === 'male' && (
+                    <div className="form-group">
+                      <label htmlFor="beard" className="form-label">Beard</label>
+                      <select
+                        id="beard"
+                        className="form-input"
+                        value={hasBeard ? 'yes' : 'no'}
+                        onChange={(e) => setHasBeard(e.target.value === 'yes')}
+                      >
+                        <option value="no">No Beard</option>
+                        <option value="yes">With Beard</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{padding: '15px', background: '#ebf8ff', borderRadius: '8px', marginBottom: '20px'}}>
+                  <p style={{margin: 0, fontSize: '13px', color: '#2c5282'}}>
+                    ℹ️ <strong>Note:</strong> The model will be generated wearing black swimwear - 
+                    {gender === 'female' ? ' a black strapless bandeau bikini' : ' black swim shorts'}.
                   </p>
                 </div>
                 
@@ -236,7 +362,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                   <button 
                     onClick={generateAIModel} 
                     className="btn btn-primary" 
-                    disabled={loading || !prompt.trim()}
+                    disabled={loading}
                     style={{width: 'auto', padding: '15px 30px'}}
                   >
                     {loading ? 'Generating AI Model...' : 'Generate AI Model'}
