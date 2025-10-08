@@ -36,6 +36,23 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
     }
   }
 
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const file = e.dataTransfer.files?.[0]
+    if (file && file.type.startsWith('image/')) {
+      setUploadedImage(file)
+      const url = URL.createObjectURL(file)
+      setPreviewUrl(url)
+    }
+  }
+
   const generateAIModel = async () => {
     setLoading(true)
     setError('')
@@ -438,15 +455,111 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                   </p>
                 </div>
                 
-                <div className="form-group">
-                  <label htmlFor="photo-upload" className="form-label">📤 Upload Model Photo</label>
+                <div 
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  style={{
+                    border: '3px dashed rgba(102, 126, 234, 0.4)',
+                    borderRadius: '16px',
+                    padding: '40px',
+                    textAlign: 'center',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.03) 0%, rgba(118, 75, 162, 0.03) 100%)',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    marginBottom: '20px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.8)'
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%)'
+                    e.currentTarget.style.transform = 'scale(1.01)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.4)'
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.03) 0%, rgba(118, 75, 162, 0.03) 100%)'
+                    e.currentTarget.style.transform = 'scale(1)'
+                  }}
+                  onClick={() => document.getElementById('photo-upload')?.click()}
+                >
+                  <div style={{
+                    width: '80px',
+                    height: '80px',
+                    margin: '0 auto 20px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '40px',
+                    boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)'
+                  }}>
+                    📤
+                  </div>
+                  
+                  <h3 style={{
+                    margin: '0 0 10px 0',
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent'
+                  }}>
+                    Upload Model Photo
+                  </h3>
+                  
+                  <p style={{
+                    margin: '0 0 15px 0',
+                    fontSize: '14px',
+                    color: '#718096'
+                  }}>
+                    Click to browse or drag and drop your image here
+                  </p>
+                  
+                  <div style={{
+                    display: 'inline-flex',
+                    gap: '15px',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexWrap: 'wrap',
+                    marginTop: '10px'
+                  }}>
+                    <div style={{
+                      padding: '8px 16px',
+                      background: 'rgba(102, 126, 234, 0.1)',
+                      borderRadius: '20px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#667eea'
+                    }}>
+                      🖱️ Click to Upload
+                    </div>
+                    <div style={{
+                      padding: '8px 16px',
+                      background: 'rgba(118, 75, 162, 0.1)',
+                      borderRadius: '20px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: '#764ba2'
+                    }}>
+                      🎯 Drag & Drop
+                    </div>
+                  </div>
+                  
+                  <p style={{
+                    margin: '15px 0 0 0',
+                    fontSize: '12px',
+                    color: '#a0aec0',
+                    fontStyle: 'italic'
+                  }}>
+                    Supported formats: JPG, PNG, GIF, WEBP
+                  </p>
+                  
                   <input
                     id="photo-upload"
                     type="file"
                     accept="image/*"
                     onChange={handleImageUpload}
-                    className="form-input"
-                    style={{padding: '8px'}}
+                    style={{display: 'none'}}
                   />
                 </div>
 
