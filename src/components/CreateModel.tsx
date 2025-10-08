@@ -232,7 +232,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                   Select the characteristics for your fashion model. The model will be generated in black swimwear.
                 </p>
                 
-                <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '20px'}}>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '20px'}}>
                   <div className="form-group">
                     <label htmlFor="gender" className="form-label">👤 Gender</label>
                     <select
