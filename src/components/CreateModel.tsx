@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { generateFashionModel, analyzeUploadedImage } from '../lib/gemini'
+import { generateFashionModel, generateModelFromUploadedImage } from '../lib/gemini'
 
 interface CreateModelProps {
   onBack?: () => void
@@ -18,7 +18,6 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
   const [generatedModel, setGeneratedModel] = useState<any>(null)
   const [uploadedImage, setUploadedImage] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [imageAnalysis, setImageAnalysis] = useState<string>('')
   
   // Model parameters
   const [gender, setGender] = useState<'male' | 'female'>('female')
@@ -87,11 +86,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
     setError('')
     
     try {
-      // Prvo analiziraj sliku sa Gemini API-jem
-      const analysis = await analyzeUploadedImage(uploadedImage)
-      setImageAnalysis(analysis.description)
-      
-      // Upload slike na Supabase Storage
+      // Upload slike direktno na Supabase Storage
       const fileExt = uploadedImage.name.split('.').pop()
       const fileName = `${user.id}-${Date.now()}.${fileExt}`
       
@@ -110,14 +105,13 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
         id: Date.now().toString(),
         imageUrl: publicUrl,
         type: 'uploaded',
-        analysis: analysis.description,
         createdAt: new Date().toISOString()
       }
       
       setGeneratedModel(processedModel)
       setSuccess(true)
     } catch (err: any) {
-      setError(err.message || 'Failed to process uploaded image. Please try again.')
+      setError(err.message || 'Failed to upload model image. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -365,13 +359,87 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
             {/* Upload Photo */}
             {selectedOption === 'upload' && (
               <div className="welcome-card">
-                <h2>Upload Your Photo</h2>
+                <h2>Upload Your Model Photo</h2>
                 <p style={{marginBottom: '20px', color: '#718096'}}>
-                  Upload a clear photo of yourself to create your personal fashion model.
+                  Upload a photo of your model already wearing a swimsuit.
                 </p>
+
+                <div style={{
+                  padding: '20px', 
+                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)', 
+                  border: '2px solid rgba(102, 126, 234, 0.3)', 
+                  borderRadius: '12px', 
+                  marginBottom: '20px',
+                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.1)'
+                }}>
+                  <h3 style={{margin: '0 0 15px 0', fontSize: '16px', color: '#4a5568', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    📸 <strong>Best Results Guidelines</strong>
+                  </h3>
+                  
+                  <div style={{display: 'flex', gap: '20px', alignItems: 'flex-start', marginBottom: '15px'}}>
+                    <div style={{flex: 1}}>
+                      <p style={{margin: '0 0 10px 0', fontSize: '14px', color: '#2d3748', fontWeight: '600'}}>
+                        ✅ Required Swimwear:
+                      </p>
+                      <ul style={{margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#4a5568', lineHeight: '1.8'}}>
+                        <li><strong>Female models:</strong> Black two-piece swimsuit (bandeau bikini top + bikini bottom)</li>
+                        <li><strong>Male models:</strong> Black swim shorts</li>
+                        <li>Full body visible (head to toes)</li>
+                        <li>Clear, high-resolution image</li>
+                        <li>Good lighting, neutral background</li>
+                      </ul>
+                    </div>
+                    
+                    <div style={{
+                      minWidth: '140px',
+                      maxWidth: '140px',
+                      padding: '8px',
+                      background: 'white',
+                      borderRadius: '10px',
+                      textAlign: 'center',
+                      border: '3px solid',
+                      borderImage: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%) 1',
+                      boxShadow: '0 4px 12px rgba(102, 126, 234, 0.2)'
+                    }}>
+                      <img 
+                        src="/dijana.png" 
+                        alt="Example Model" 
+                        style={{
+                          width: '100%',
+                          height: 'auto',
+                          borderRadius: '6px',
+                          marginBottom: '8px'
+                        }}
+                      />
+                      <p style={{
+                        margin: 0, 
+                        fontSize: '11px', 
+                        color: '#667eea', 
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        ✨ Example Look
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <p style={{
+                    margin: 0, 
+                    fontSize: '13px', 
+                    color: '#4a5568', 
+                    fontStyle: 'italic',
+                    padding: '12px',
+                    background: 'rgba(255, 255, 255, 0.7)',
+                    borderRadius: '8px',
+                    borderLeft: '4px solid #667eea'
+                  }}>
+                    💡 <strong>Tip:</strong> Models wearing the correct swimwear will give you the best results for dressing them in different outfits later!
+                  </p>
+                </div>
                 
                 <div className="form-group">
-                  <label htmlFor="photo-upload" className="form-label">Choose Photo</label>
+                  <label htmlFor="photo-upload" className="form-label">📤 Upload Model Photo</label>
                   <input
                     id="photo-upload"
                     type="file"
@@ -384,6 +452,9 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
 
                 {previewUrl && (
                   <div style={{textAlign: 'center', margin: '20px 0'}}>
+                    <p style={{fontSize: '14px', color: '#718096', marginBottom: '10px', fontWeight: '600'}}>
+                      Preview:
+                    </p>
                     <img 
                       src={previewUrl} 
                       alt="Preview" 
@@ -397,13 +468,6 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                   </div>
                 )}
 
-                {imageAnalysis && (
-                  <div className="info-box" style={{marginTop: '20px'}}>
-                    <h3>AI Analysis</h3>
-                    <p style={{fontSize: '14px', lineHeight: '1.6'}}>{imageAnalysis}</p>
-                  </div>
-                )}
-
                 {error && <div className="alert alert-error">{error}</div>}
                 
                 <div style={{textAlign: 'center', marginBottom: '20px'}}>
@@ -413,9 +477,16 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                     disabled={loading || !uploadedImage}
                     style={{width: 'auto', padding: '15px 30px'}}
                   >
-                    {loading ? 'Processing Image...' : 'Create Model from Photo'}
+                    {loading ? 'Uploading Model...' : '💾 Save Model'}
                   </button>
                 </div>
+
+                {loading && (
+                  <div style={{textAlign: 'center'}}>
+                    <div className="spinner" style={{margin: '0 auto'}}></div>
+                    <p style={{marginTop: '10px', color: '#718096'}}>Saving your model...</p>
+                  </div>
+                )}
 
                 <div style={{textAlign: 'center'}}>
                   <button onClick={resetForm} className="btn btn-secondary" style={{width: 'auto', padding: '10px 20px'}}>
