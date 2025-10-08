@@ -126,37 +126,78 @@ body {
   color: #a0aec0;
 }
 
-/* Custom Select Dropdown */
+/* Custom Select Dropdown - Enhanced Modern Design */
 .custom-select {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23667eea' d='M8 11L3 6h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 16px;
-  padding-right: 40px;
+  background: linear-gradient(to right, #ffffff 0%, #f7fafc 100%);
+  background-image: 
+    linear-gradient(to right, #ffffff 0%, #f7fafc 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath fill='%23667eea' d='M10 12l-5-5h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, no-repeat;
+  background-position: left center, right 14px center;
+  background-size: 100%, 18px;
+  padding-right: 45px;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
   color: #2d3748;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
 
 .custom-select:hover {
   border-color: #667eea;
-  background-color: #f7fafc;
+  background: linear-gradient(to right, #fefefe 0%, #f0f4ff 100%);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  transform: translateY(-1px);
 }
 
 .custom-select:focus {
   border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
-  background-color: #ffffff;
+  background: #ffffff;
+  box-shadow: 
+    0 0 0 4px rgba(102, 126, 234, 0.12),
+    0 8px 20px rgba(102, 126, 234, 0.2);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+.custom-select:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
 }
 
 .custom-select option {
-  padding: 12px;
+  padding: 14px 16px;
   background: white;
   color: #2d3748;
   font-weight: 500;
+  transition: all 0.2s;
+}
+
+.custom-select option:hover {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+/* Form Group Enhanced */
+.form-group {
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.form-group .form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 12px;
 }
 
 /* Buttons */

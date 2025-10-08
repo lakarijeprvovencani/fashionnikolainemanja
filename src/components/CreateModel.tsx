@@ -234,94 +234,94 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                 
                 <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '20px'}}>
                   <div className="form-group">
-                    <label htmlFor="gender" className="form-label">Gender</label>
+                    <label htmlFor="gender" className="form-label">👤 Gender</label>
                     <select
                       id="gender"
                       className="form-input custom-select"
                       value={gender}
                       onChange={(e) => setGender(e.target.value as 'male' | 'female')}
                     >
-                      <option value="female">Female</option>
-                      <option value="male">Male</option>
+                      <option value="female">👩 Female</option>
+                      <option value="male">👨 Male</option>
                     </select>
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="body-type" className="form-label">Body Type</label>
+                    <label htmlFor="body-type" className="form-label">💪 Body Type</label>
                     <select
                       id="body-type"
                       className="form-input custom-select"
                       value={bodyType}
                       onChange={(e) => setBodyType(e.target.value as 'fit' | 'plus-size')}
                     >
-                      <option value="fit">Fit / Athletic</option>
-                      <option value="plus-size">Plus Size / Curvy</option>
+                      <option value="fit">🏃 Fit / Athletic</option>
+                      <option value="plus-size">👗 Plus Size / Curvy</option>
                     </select>
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="ethnicity" className="form-label">Ethnicity</label>
+                    <label htmlFor="ethnicity" className="form-label">🌍 Ethnicity</label>
                     <select
                       id="ethnicity"
                       className="form-input custom-select"
                       value={ethnicity}
                       onChange={(e) => setEthnicity(e.target.value)}
                     >
-                      <option value="Caucasian">Caucasian</option>
-                      <option value="African">African</option>
-                      <option value="Asian">Asian</option>
-                      <option value="Hispanic">Hispanic</option>
-                      <option value="Middle Eastern">Middle Eastern</option>
-                      <option value="Mixed">Mixed</option>
+                      <option value="Caucasian">🇪🇺 Caucasian</option>
+                      <option value="African">🌍 African</option>
+                      <option value="Asian">🌏 Asian</option>
+                      <option value="Hispanic">🌎 Hispanic</option>
+                      <option value="Middle Eastern">🏜️ Middle Eastern</option>
+                      <option value="Mixed">🌈 Mixed</option>
                     </select>
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="hair-color" className="form-label">Hair Color</label>
+                    <label htmlFor="hair-color" className="form-label">💇 Hair Color</label>
                     <select
                       id="hair-color"
                       className="form-input custom-select"
                       value={hairColor}
                       onChange={(e) => setHairColor(e.target.value)}
                     >
-                      <option value="Black">Black</option>
-                      <option value="Brown">Brown</option>
-                      <option value="Blonde">Blonde</option>
-                      <option value="Red">Red</option>
-                      <option value="Auburn">Auburn</option>
-                      <option value="Gray">Gray</option>
-                      <option value="White">White</option>
+                      <option value="Black">⚫ Black</option>
+                      <option value="Brown">🟤 Brown</option>
+                      <option value="Blonde">💛 Blonde</option>
+                      <option value="Red">🔴 Red</option>
+                      <option value="Auburn">🟠 Auburn</option>
+                      <option value="Gray">⚪ Gray</option>
+                      <option value="White">⚪ White</option>
                     </select>
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="eye-color" className="form-label">Eye Color</label>
+                    <label htmlFor="eye-color" className="form-label">👁️ Eye Color</label>
                     <select
                       id="eye-color"
                       className="form-input custom-select"
                       value={eyeColor}
                       onChange={(e) => setEyeColor(e.target.value)}
                     >
-                      <option value="Brown">Brown</option>
-                      <option value="Blue">Blue</option>
-                      <option value="Green">Green</option>
-                      <option value="Hazel">Hazel</option>
-                      <option value="Gray">Gray</option>
-                      <option value="Amber">Amber</option>
+                      <option value="Brown">🟤 Brown</option>
+                      <option value="Blue">🔵 Blue</option>
+                      <option value="Green">🟢 Green</option>
+                      <option value="Hazel">🌰 Hazel</option>
+                      <option value="Gray">⚫ Gray</option>
+                      <option value="Amber">🟡 Amber</option>
                     </select>
                   </div>
 
                   {gender === 'male' && (
                     <div className="form-group">
-                      <label htmlFor="beard" className="form-label">Beard</label>
+                      <label htmlFor="beard" className="form-label">🧔 Beard</label>
                       <select
                         id="beard"
                         className="form-input custom-select"
                         value={hasBeard ? 'yes' : 'no'}
                         onChange={(e) => setHasBeard(e.target.value === 'yes')}
                       >
-                        <option value="no">No Beard</option>
-                        <option value="yes">With Beard</option>
+                        <option value="no">❌ No Beard</option>
+                        <option value="yes">✅ With Beard</option>
                       </select>
                     </div>
                   )}
