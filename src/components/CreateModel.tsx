@@ -22,8 +22,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
   
   // Model parameters
   const [gender, setGender] = useState<'male' | 'female'>('female')
-  const [height, setHeight] = useState('175cm')
-  const [weight, setWeight] = useState('65kg')
+  const [bodyType, setBodyType] = useState<'fit' | 'plus-size'>('fit')
   const [ethnicity, setEthnicity] = useState('Caucasian')
   const [hairColor, setHairColor] = useState('Brown')
   const [eyeColor, setEyeColor] = useState('Brown')
@@ -50,7 +49,11 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
       
       const beardDescription = gender === 'male' && hasBeard ? 'with beard' : ''
       
-      const constructedPrompt = `A professional fashion model, ${gender}, ${height} tall, ${weight}, ${ethnicity} ethnicity, ${hairColor} hair, ${eyeColor} eyes ${beardDescription}, ${swimwearDescription}. Show the full-body view of the model from head to toes, with feet fully visible, professional studio lighting, neutral background, editorial fashion photography style, photorealistic, high resolution.`
+      const bodyDescription = bodyType === 'fit' 
+        ? 'fit athletic body type'
+        : 'plus-size curvy body type'
+      
+      const constructedPrompt = `A professional fashion model, ${gender}, ${bodyDescription}, ${ethnicity} ethnicity, ${hairColor} hair, ${eyeColor} eyes ${beardDescription}, ${swimwearDescription}. Show the full-body view of the model from head to toes, with feet fully visible, professional studio lighting, neutral background, editorial fashion photography style, photorealistic, high resolution.`
       
       console.log('Generated prompt:', constructedPrompt)
       
@@ -244,40 +247,15 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="height" className="form-label">Height</label>
+                    <label htmlFor="body-type" className="form-label">Body Type</label>
                     <select
-                      id="height"
+                      id="body-type"
                       className="form-input custom-select"
-                      value={height}
-                      onChange={(e) => setHeight(e.target.value)}
+                      value={bodyType}
+                      onChange={(e) => setBodyType(e.target.value as 'fit' | 'plus-size')}
                     >
-                      <option value="160cm">160cm (5'3")</option>
-                      <option value="165cm">165cm (5'5")</option>
-                      <option value="170cm">170cm (5'7")</option>
-                      <option value="175cm">175cm (5'9")</option>
-                      <option value="180cm">180cm (5'11")</option>
-                      <option value="185cm">185cm (6'1")</option>
-                      <option value="190cm">190cm (6'3")</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="weight" className="form-label">Weight</label>
-                    <select
-                      id="weight"
-                      className="form-input custom-select"
-                      value={weight}
-                      onChange={(e) => setWeight(e.target.value)}
-                    >
-                      <option value="50kg">50kg (110 lbs)</option>
-                      <option value="55kg">55kg (121 lbs)</option>
-                      <option value="60kg">60kg (132 lbs)</option>
-                      <option value="65kg">65kg (143 lbs)</option>
-                      <option value="70kg">70kg (154 lbs)</option>
-                      <option value="75kg">75kg (165 lbs)</option>
-                      <option value="80kg">80kg (176 lbs)</option>
-                      <option value="85kg">85kg (187 lbs)</option>
-                      <option value="90kg">90kg (198 lbs)</option>
+                      <option value="fit">Fit / Athletic</option>
+                      <option value="plus-size">Plus Size / Curvy</option>
                     </select>
                   </div>
 
