@@ -451,48 +451,207 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack }) => {
                 </div>
 
                 {previewUrl && (
-                  <div style={{textAlign: 'center', margin: '20px 0'}}>
-                    <p style={{fontSize: '14px', color: '#718096', marginBottom: '10px', fontWeight: '600'}}>
-                      Preview:
-                    </p>
-                    <img 
-                      src={previewUrl} 
-                      alt="Preview" 
-                      style={{
-                        maxWidth: '300px', 
-                        maxHeight: '400px', 
-                        borderRadius: '10px',
-                        boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
-                      }} 
-                    />
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+                    padding: '30px',
+                    borderRadius: '16px',
+                    border: '2px solid rgba(102, 126, 234, 0.2)',
+                    marginBottom: '25px',
+                    boxShadow: '0 8px 24px rgba(102, 126, 234, 0.12)',
+                    animation: 'fadeIn 0.4s ease-in'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px',
+                      marginBottom: '20px'
+                    }}>
+                      <div style={{
+                        width: '40px',
+                        height: '3px',
+                        background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                        borderRadius: '2px'
+                      }}></div>
+                      <h3 style={{
+                        margin: 0,
+                        fontSize: '18px',
+                        fontWeight: '700',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px'
+                      }}>
+                        Preview
+                      </h3>
+                      <div style={{
+                        width: '40px',
+                        height: '3px',
+                        background: 'linear-gradient(90deg, #764ba2 0%, #667eea 100%)',
+                        borderRadius: '2px'
+                      }}></div>
+                    </div>
+                    
+                    <div style={{
+                      textAlign: 'center',
+                      position: 'relative'
+                    }}>
+                      <div style={{
+                        display: 'inline-block',
+                        position: 'relative',
+                        padding: '8px',
+                        background: 'white',
+                        borderRadius: '12px',
+                        boxShadow: '0 8px 32px rgba(102, 126, 234, 0.2)',
+                        border: '3px solid transparent',
+                        backgroundImage: 'linear-gradient(white, white), linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        backgroundOrigin: 'border-box',
+                        backgroundClip: 'padding-box, border-box'
+                      }}>
+                        <img 
+                          src={previewUrl} 
+                          alt="Model Preview" 
+                          style={{
+                            maxWidth: '350px',
+                            maxHeight: '500px',
+                            width: '100%',
+                            height: 'auto',
+                            borderRadius: '8px',
+                            display: 'block'
+                          }} 
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          top: '16px',
+                          right: '16px',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          color: 'white',
+                          padding: '6px 12px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)'
+                        }}>
+                          ✓ Ready
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {error && <div className="alert alert-error">{error}</div>}
+                {error && (
+                  <div className="alert alert-error" style={{
+                    animation: 'shake 0.5s ease-in-out',
+                    marginBottom: '20px'
+                  }}>
+                    {error}
+                  </div>
+                )}
                 
-                <div style={{textAlign: 'center', marginBottom: '20px'}}>
+                <div style={{
+                  display: 'flex',
+                  gap: '15px',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: '20px',
+                  flexWrap: 'wrap'
+                }}>
                   <button 
                     onClick={processUploadedImage} 
                     className="btn btn-primary" 
                     disabled={loading || !uploadedImage}
-                    style={{width: 'auto', padding: '15px 30px'}}
+                    style={{
+                      width: 'auto',
+                      padding: '16px 40px',
+                      fontSize: '16px',
+                      fontWeight: '700',
+                      background: loading || !uploadedImage 
+                        ? '#cbd5e0' 
+                        : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      border: 'none',
+                      borderRadius: '12px',
+                      boxShadow: loading || !uploadedImage 
+                        ? 'none' 
+                        : '0 6px 20px rgba(102, 126, 234, 0.4)',
+                      transition: 'all 0.3s ease',
+                      cursor: loading || !uploadedImage ? 'not-allowed' : 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading && uploadedImage) {
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                        e.currentTarget.style.boxShadow = '0 8px 28px rgba(102, 126, 234, 0.5)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!loading && uploadedImage) {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)'
+                      }
+                    }}
                   >
-                    {loading ? 'Uploading Model...' : '💾 Save Model'}
+                    {loading ? (
+                      <span style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                        <span className="spinner" style={{width: '20px', height: '20px', borderWidth: '2px'}}></span>
+                        Uploading...
+                      </span>
+                    ) : (
+                      <span style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                        💾 Save Model
+                      </span>
+                    )}
+                  </button>
+
+                  <button 
+                    onClick={resetForm} 
+                    className="btn btn-secondary" 
+                    style={{
+                      width: 'auto',
+                      padding: '16px 30px',
+                      fontSize: '15px',
+                      fontWeight: '600',
+                      background: 'white',
+                      color: '#667eea',
+                      border: '2px solid #667eea',
+                      borderRadius: '12px',
+                      transition: 'all 0.3s ease',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                      e.currentTarget.style.color = 'white'
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.color = '#667eea'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                    }}
+                  >
+                    ← Back to Options
                   </button>
                 </div>
 
                 {loading && (
-                  <div style={{textAlign: 'center'}}>
-                    <div className="spinner" style={{margin: '0 auto'}}></div>
-                    <p style={{marginTop: '10px', color: '#718096'}}>Saving your model...</p>
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '20px',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+                    borderRadius: '12px',
+                    animation: 'pulse 2s ease-in-out infinite'
+                  }}>
+                    <p style={{
+                      margin: 0,
+                      fontSize: '14px',
+                      color: '#667eea',
+                      fontWeight: '600'
+                    }}>
+                      🚀 Saving your model to the cloud...
+                    </p>
                   </div>
                 )}
-
-                <div style={{textAlign: 'center'}}>
-                  <button onClick={resetForm} className="btn btn-secondary" style={{width: 'auto', padding: '10px 20px'}}>
-                    Back to Options
-                  </button>
-                </div>
               </div>
             )}
           </>
