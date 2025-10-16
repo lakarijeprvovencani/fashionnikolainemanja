@@ -186,38 +186,56 @@ export const generateDressedModel = async (options: DressModelOptions): Promise<
   try {
     const { modelImageUrl, clothingImages, backgroundPrompt } = options
     
+    // Fetch the original model image
+    const modelImageResponse = await fetch(modelImageUrl)
+    const modelImageBlob = await modelImageResponse.blob()
+    const modelImageFile = new File([modelImageBlob], 'model.png', { type: modelImageBlob.type })
+    const modelImageBase64 = await fileToBase64(modelImageFile)
+    
     // Convert clothing images to base64
     const clothingBase64Array = await Promise.all(
       clothingImages.map(file => fileToBase64(file))
     )
     
-    // Build the prompt
+    // Build the prompt - EXPLICITLY state to use the SAME model from the first image
     const clothingDescription = clothingImages.length === 1 
-      ? 'the clothing item shown in the image'
-      : `the ${clothingImages.length} clothing items shown in the images`
+      ? 'the clothing item shown'
+      : `the ${clothingImages.length} clothing items shown`
     
-    const prompt = `Create a professional fashion photoshoot image. Take the model and dress them wearing ${clothingDescription}. The setting should be: ${backgroundPrompt}. 
+    const prompt = `CRITICAL: Use the EXACT SAME person/model from the first image provided. Do NOT create a new model or change the person's appearance.
 
-Important requirements:
-- Keep the model's face, body type, and overall appearance identical
-- Dress the model in the clothing items provided
-- Match the clothing fit naturally to the model's body
-- Use professional fashion photography lighting
+Take the model from the first image and dress them in ${clothingDescription} in the other image(s). The setting should be: ${backgroundPrompt}.
+
+STRICT REQUIREMENTS:
+- Use the EXACT SAME model/person from the first image (face, body, ethnicity, everything must be identical)
+- Only change: the clothing and the background
+- The model MUST look exactly like in the first image
+- Apply the clothing items from the other images onto THIS SPECIFIC model
+- Keep the model's pose natural for fashion photography
+- Background: ${backgroundPrompt}
+- Professional fashion photography lighting
 - High resolution, photorealistic quality
-- Full body shot showing the complete outfit
-- The background should match: ${backgroundPrompt}
+- Full body shot from head to toes
 
-Create a cohesive, professional fashion photograph.`
+DO NOT generate a different person. Use the model from the first image and dress them in the provided clothing.`
 
-    console.log('Generating dressed model with prompt:', prompt)
+    console.log('Generating dressed model with SAME model constraint')
+    console.log('Model image URL:', modelImageUrl)
     console.log('Number of clothing images:', clothingImages.length)
     
-    // Prepare parts for the API call
+    // Prepare parts for the API call - MODEL IMAGE FIRST (crucial!)
     const parts: any[] = [
-      { text: prompt }
+      { text: prompt },
+      // Add the original model image FIRST
+      {
+        inlineData: {
+          mimeType: modelImageFile.type,
+          data: modelImageBase64.split(',')[1]
+        }
+      }
     ]
     
-    // Add clothing images
+    // Add clothing images AFTER the model image
     clothingBase64Array.forEach((base64Image, index) => {
       parts.push({
         inlineData: {
@@ -228,7 +246,7 @@ Create a cohesive, professional fashion photograph.`
     })
     
     // System instruction
-    const systemInstructionText = `You are an AI fashion stylist and photographer. Your task is to create photorealistic fashion images by dressing models in provided clothing items. The output must be professional, high-quality fashion photography suitable for e-commerce, lookbooks, and fashion magazines. Maintain the model's identity while seamlessly applying the clothing items.`
+    const systemInstructionText = `You are an AI fashion stylist. Your CRITICAL task is to take the EXACT model from the first image and dress them in the clothing items shown in the subsequent images. You MUST NOT create a new model or change the person's appearance. The model's identity (face, body, ethnicity, features) must remain IDENTICAL to the first image. Only the clothing and background should change.`
     
     // API call using gemini-2.5-flash-image
     const response = await ai.models.generateContent({

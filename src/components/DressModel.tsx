@@ -141,63 +141,14 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
     }
   }
 
-  const handleSave = async () => {
-    if (!generatedImage || !user || !selectedModel) return
+  const handleDownload = () => {
+    if (!generatedImage || !selectedModel) return
     
-    setLoading(true)
-    setError('')
-    
-    try {
-      // Convert base64 to blob
-      const base64Data = generatedImage.split(',')[1]
-      const blob = await fetch(`data:image/png;base64,${base64Data}`).then(r => r.blob())
-      
-      // Upload to Supabase Storage
-      const fileName = `${user.id}-dressed-${Date.now()}.png`
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('model-images')
-        .upload(fileName, blob)
-      
-      if (uploadError) throw uploadError
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from('model-images')
-        .getPublicUrl(fileName)
-      
-      // Save to database
-      const { error: dbError } = await supabase
-        .from('fashion_models')
-        .insert({
-          user_id: user.id,
-          model_name: `${selectedModel.model_name} - Dressed`,
-          model_image_url: publicUrl,
-          model_data: {
-            type: 'dressed',
-            original_model_id: selectedModel.id,
-            background: selectedBackground,
-            clothing_count: clothingImages.length
-          },
-          status: 'completed'
-        })
-      
-      if (dbError) throw dbError
-      
-      alert('✅ Dressed model saved successfully!')
-      
-      // Reset form
-      setGeneratedImage(null)
-      setClothingImages([])
-      setPreviewUrls([])
-      setSuccess(false)
-      
-      if (onBack) {
-        onBack()
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to save dressed model. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    // Download image
+    const link = document.createElement('a')
+    link.href = generatedImage
+    link.download = `${selectedModel.model_name}-dressed-${Date.now()}.png`
+    link.click()
   }
 
   if (showModelSelector && !selectedModel) {
@@ -610,8 +561,7 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
             ) : (
               <>
                 <button
-                  onClick={handleSave}
-                  disabled={loading}
+                  onClick={handleDownload}
                   style={{
                     padding: '14px 32px',
                     background: 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)',
@@ -620,14 +570,22 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
                     borderRadius: '10px',
                     fontSize: '15px',
                     fontWeight: '700',
-                    cursor: loading ? 'not-allowed' : 'pointer',
+                    cursor: 'pointer',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px',
                     boxShadow: '0 4px 12px rgba(72, 187, 120, 0.4)',
                     transition: 'all 0.3s'
                   }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(72, 187, 120, 0.6)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(72, 187, 120, 0.4)'
+                  }}
                 >
-                  {loading ? '💾 Čuvam...' : '💾 Sačuvaj Model'}
+                  📥 Download Image
                 </button>
                 
                 <button
@@ -649,6 +607,14 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px',
                     transition: 'all 0.3s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#667eea'
+                    e.currentTarget.style.color = 'white'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'white'
+                    e.currentTarget.style.color = '#667eea'
                   }}
                 >
                   🔄 Generiši Novo
