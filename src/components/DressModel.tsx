@@ -279,7 +279,14 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
           </div>
         )}
 
-        <div className="welcome-card">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '30px',
+          alignItems: 'start'
+        }}>
+          {/* LEFT COLUMN - Controls */}
+          <div className="welcome-card" style={{margin: 0}}>
           {/* Selected Model Section */}
           <div style={{marginBottom: '30px'}}>
             <label style={{
@@ -515,27 +522,9 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
             </div>
           </div>
 
-          {/* Generated Image Preview */}
-          {generatedImage && (
-            <div style={{marginBottom: '30px', textAlign: 'center'}}>
-              <h3 style={{marginBottom: '15px', color: '#1a202c'}}>Generated Result</h3>
-              <img 
-                src={generatedImage}
-                alt="Generated dressed model"
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '600px',
-                  borderRadius: '12px',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-                  objectFit: 'contain'
-                }}
-              />
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div style={{display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap'}}>
-            {!generatedImage ? (
+          {/* Generate Button - Only show when no image generated */}
+          {!generatedImage && (
+            <div style={{display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '20px'}}>
               <button
                 onClick={handleGenerate}
                 disabled={loading || !selectedModel || clothingImages.length === 0}
@@ -558,73 +547,11 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
               >
                 {loading ? '⏳ Generating...' : '🎨 Generate Image'}
               </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleDownload}
-                  style={{
-                    padding: '14px 32px',
-                    background: 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '15px',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    boxShadow: '0 4px 12px rgba(72, 187, 120, 0.4)',
-                    transition: 'all 0.3s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(72, 187, 120, 0.6)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(72, 187, 120, 0.4)'
-                  }}
-                >
-                  📥 Download Image
-                </button>
-                
-                <button
-                  onClick={() => {
-                    setGeneratedImage(null)
-                    setClothingImages([])
-                    setPreviewUrls([])
-                    setSuccess(false)
-                  }}
-                  style={{
-                    padding: '14px 32px',
-                    background: 'white',
-                    color: '#667eea',
-                    border: '2px solid #667eea',
-                    borderRadius: '10px',
-                    fontSize: '15px',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    transition: 'all 0.3s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#667eea'
-                    e.currentTarget.style.color = 'white'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'white'
-                    e.currentTarget.style.color = '#667eea'
-                  }}
-                >
-                  🔄 Generate New
-                </button>
-              </>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Info Message */}
-          {selectedModel && clothingImages.length === 0 && (
+          {selectedModel && clothingImages.length === 0 && !generatedImage && (
             <div style={{
               marginTop: '20px',
               padding: '15px',
@@ -634,11 +561,148 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
               textAlign: 'center'
             }}>
               <p style={{margin: 0, fontSize: '14px', color: '#92400e'}}>
-                💡 <strong>Your generated model will appear here.</strong><br/>
+                💡 <strong>Your generated model will appear on the right.</strong><br/>
                 <em>Generation time: 15-45 seconds.</em>
               </p>
             </div>
           )}
+          </div>
+          
+          {/* RIGHT COLUMN - Preview */}
+          <div style={{
+            position: 'sticky',
+            top: '20px',
+            height: 'fit-content'
+          }}>
+            {generatedImage ? (
+              <div className="welcome-card" style={{margin: 0, padding: '30px', textAlign: 'center'}}>
+                <h3 style={{
+                  marginBottom: '20px', 
+                  color: '#1a202c',
+                  fontSize: '20px',
+                  fontWeight: '700'
+                }}>
+                  Generated Result
+                </h3>
+                <img 
+                  src={generatedImage}
+                  alt="Generated dressed model"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '700px',
+                    borderRadius: '12px',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+                    objectFit: 'contain',
+                    marginBottom: '25px'
+                  }}
+                />
+                
+                {/* Action Buttons - Download & Generate New */}
+                <div style={{display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap'}}>
+                  <button
+                    onClick={handleDownload}
+                    style={{
+                      padding: '14px 32px',
+                      background: 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '15px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      boxShadow: '0 4px 12px rgba(72, 187, 120, 0.4)',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(72, 187, 120, 0.6)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(72, 187, 120, 0.4)'
+                    }}
+                  >
+                    📥 Download Image
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setGeneratedImage(null)
+                      setClothingImages([])
+                      setPreviewUrls([])
+                      setSuccess(false)
+                    }}
+                    style={{
+                      padding: '14px 32px',
+                      background: 'white',
+                      color: '#667eea',
+                      border: '2px solid #667eea',
+                      borderRadius: '10px',
+                      fontSize: '15px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#667eea'
+                      e.currentTarget.style.color = 'white'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.color = '#667eea'
+                    }}
+                  >
+                    🔄 Generate New
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)',
+                borderRadius: '16px',
+                padding: '60px 40px',
+                textAlign: 'center',
+                border: '2px dashed #cbd5e0',
+                minHeight: '500px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <div style={{fontSize: '80px', marginBottom: '20px', opacity: 0.3}}>
+                  👗
+                </div>
+                <h3 style={{
+                  color: '#718096',
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  marginBottom: '10px'
+                }}>
+                  Preview Area
+                </h3>
+                <p style={{
+                  color: '#a0aec0',
+                  fontSize: '14px',
+                  maxWidth: '300px',
+                  lineHeight: '1.6'
+                }}>
+                  Upload clothing images and click Generate to see your model dressed in the selected outfit
+                </p>
+                {loading && (
+                  <div style={{marginTop: '30px'}}>
+                    <div className="spinner" style={{margin: '0 auto'}}></div>
+                    <p style={{color: '#667eea', fontWeight: '600', marginTop: '15px'}}>
+                      Generating your model...
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>
