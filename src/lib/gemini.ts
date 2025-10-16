@@ -96,6 +96,76 @@ export const analyzeUploadedImage = async (imageFile: File): Promise<{
   }
 }
 
+export const generateModelFromUploadedImage = async (imageFile: File): Promise<string> => {
+  try {
+    // Konvertovanje slike u base64
+    const base64Image = await fileToBase64(imageFile)
+    
+    console.log('Transforming uploaded image to model in swimwear with Gemini 2.5 Flash Image Preview...')
+    
+    const base64Data = base64Image.split(',')[1]
+    const imagePart = { inlineData: { data: base64Data, mimeType: imageFile.type } }
+    
+    // Test prompt - samo promeni pozadinu u sivu
+    const transformPrompt = `Change the background to solid gray. Keep everything else exactly the same.`
+    
+    const textPart = { text: transformPrompt }
+    
+    // API poziv sa image preview modelom koji podržava image input
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image-preview',
+      contents: { parts: [imagePart, textPart] },
+      config: {
+        responseModalities: [Modality.IMAGE],
+        imageConfig: {
+          aspectRatio: '9:16',
+          numberOfImages: 1
+        }
+      }
+    })
+    
+    console.log('API Response:', JSON.stringify(response, null, 2))
+    
+    // Pronalaženje slike - proveravam sve moguće strukture
+    let imageData = null
+    
+    if (response.candidates && response.candidates[0]) {
+      const candidate = response.candidates[0]
+      console.log('Candidate:', candidate)
+      
+      // Proveravam različite strukture odgovora
+      if (candidate.content?.parts) {
+        const imagePart = candidate.content.parts.find((part: any) => part.inlineData)
+        if (imagePart?.inlineData) {
+          imageData = imagePart.inlineData.data
+        }
+      }
+      
+      // Alternativna struktura
+      if (!imageData && candidate.output?.inlineData) {
+        imageData = candidate.output.inlineData.data
+      }
+      
+      // Još jedna alternativa
+      if (!imageData && candidate.image) {
+        imageData = candidate.image
+      }
+    }
+    
+    console.log('Found image data:', imageData ? 'YES' : 'NO')
+    
+    if (imageData) {
+      return `data:image/png;base64,${imageData}`
+    }
+    
+    throw new Error('No image generated in response')
+    
+  } catch (error: any) {
+    console.error('Error transforming image:', error)
+    throw new Error(error.message || 'Failed to transform image. Please try again.')
+  }
+}
+
 // Helper function to convert file to base64
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -104,4 +174,90 @@ const fileToBase64 = (file: File): Promise<string> => {
     reader.onload = () => resolve(reader.result as string)
     reader.onerror = error => reject(error)
   })
+}
+
+interface DressModelOptions {
+  modelImageUrl: string
+  clothingImages: File[]
+  backgroundPrompt: string
+}
+
+export const generateDressedModel = async (options: DressModelOptions): Promise<string> => {
+  try {
+    const { modelImageUrl, clothingImages, backgroundPrompt } = options
+    
+    // Convert clothing images to base64
+    const clothingBase64Array = await Promise.all(
+      clothingImages.map(file => fileToBase64(file))
+    )
+    
+    // Build the prompt
+    const clothingDescription = clothingImages.length === 1 
+      ? 'the clothing item shown in the image'
+      : `the ${clothingImages.length} clothing items shown in the images`
+    
+    const prompt = `Create a professional fashion photoshoot image. Take the model and dress them wearing ${clothingDescription}. The setting should be: ${backgroundPrompt}. 
+
+Important requirements:
+- Keep the model's face, body type, and overall appearance identical
+- Dress the model in the clothing items provided
+- Match the clothing fit naturally to the model's body
+- Use professional fashion photography lighting
+- High resolution, photorealistic quality
+- Full body shot showing the complete outfit
+- The background should match: ${backgroundPrompt}
+
+Create a cohesive, professional fashion photograph.`
+
+    console.log('Generating dressed model with prompt:', prompt)
+    console.log('Number of clothing images:', clothingImages.length)
+    
+    // Prepare parts for the API call
+    const parts: any[] = [
+      { text: prompt }
+    ]
+    
+    // Add clothing images
+    clothingBase64Array.forEach((base64Image, index) => {
+      parts.push({
+        inlineData: {
+          mimeType: clothingImages[index].type,
+          data: base64Image.split(',')[1]
+        }
+      })
+    })
+    
+    // System instruction
+    const systemInstructionText = `You are an AI fashion stylist and photographer. Your task is to create photorealistic fashion images by dressing models in provided clothing items. The output must be professional, high-quality fashion photography suitable for e-commerce, lookbooks, and fashion magazines. Maintain the model's identity while seamlessly applying the clothing items.`
+    
+    // API call using gemini-2.5-flash-image
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      system: { parts: [{ text: systemInstructionText }] },
+      contents: { parts: parts },
+      config: {
+        responseModalities: [Modality.IMAGE],
+        imageConfig: {
+          aspectRatio: '9:16',
+          numberOfImages: 1
+        }
+      },
+    })
+    
+    console.log('API Response received')
+    
+    // Extract image from response
+    const imagePart = response.candidates?.[0]?.content?.parts.find((part: any) => part.inlineData)
+    
+    if (imagePart?.inlineData) {
+      const base64Image = imagePart.inlineData.data
+      return `data:image/png;base64,${base64Image}`
+    }
+    
+    throw new Error('No image generated in response')
+    
+  } catch (error: any) {
+    console.error('Error generating dressed model:', error)
+    throw new Error(error.message || 'Failed to generate dressed model. Please try again.')
+  }
 }

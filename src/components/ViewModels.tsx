@@ -154,8 +154,9 @@ const ViewModels: React.FC<ViewModelsProps> = ({ onBack, onSelectModel }) => {
               <div style={{display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px', flexWrap: 'wrap'}}>
                 <button 
                   onClick={() => {
-                    // For now just show alert, will be used for "Dress Model" later
-                    alert(`Use This Model feature coming soon!\nModel: ${selectedModel.model_name}`)
+                    if (onSelectModel) {
+                      onSelectModel(selectedModel)
+                    }
                   }}
                   style={{
                     width: 'auto',
@@ -325,8 +326,9 @@ const ViewModels: React.FC<ViewModelsProps> = ({ onBack, onSelectModel }) => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      // For now just show alert, will be used for "Dress Model" later
-                      alert(`Use This Model feature coming soon!\nModel: ${model.model_name}`)
+                      if (onSelectModel) {
+                        onSelectModel(model)
+                      }
                     }}
                     style={{
                       width: '100%',

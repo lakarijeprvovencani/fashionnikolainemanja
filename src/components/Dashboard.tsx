@@ -3,6 +3,16 @@ import { useAuth } from '../contexts/AuthContext'
 import { db } from '../lib/supabase'
 import CreateModel from './CreateModel'
 import ViewModels from './ViewModels'
+import DressModel from './DressModel'
+
+interface FashionModel {
+  id: string
+  model_name: string
+  model_image_url: string
+  model_data: any
+  created_at: string
+  status: string
+}
 
 const Dashboard: React.FC = () => {
   const { user, signOut } = useAuth()
@@ -10,6 +20,7 @@ const Dashboard: React.FC = () => {
   const [modelsCount, setModelsCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'dress-model' | 'view-models'>('dashboard')
+  const [selectedModelForDressing, setSelectedModelForDressing] = useState<FashionModel | null>(null)
 
   const checkUserModels = async () => {
     if (user) {
@@ -61,7 +72,23 @@ const Dashboard: React.FC = () => {
   }
 
   if (currentView === 'view-models') {
-    return <ViewModels onBack={() => setCurrentView('dashboard')} />
+    return <ViewModels 
+      onBack={() => setCurrentView('dashboard')}
+      onSelectModel={(model) => {
+        setSelectedModelForDressing(model)
+        setCurrentView('dress-model')
+      }}
+    />
+  }
+
+  if (currentView === 'dress-model') {
+    return <DressModel 
+      onBack={() => {
+        setCurrentView('dashboard')
+        setSelectedModelForDressing(null)
+      }}
+      preselectedModel={selectedModelForDressing}
+    />
   }
 
   return (
@@ -120,7 +147,11 @@ const Dashboard: React.FC = () => {
                 : 'Create a model first to unlock this feature'
               }
             </p>
-            <button className={`btn-action ${hasModels ? 'success' : 'disabled'}`} disabled={!hasModels}>
+            <button 
+              className={`btn-action ${hasModels ? 'success' : 'disabled'}`} 
+              disabled={!hasModels}
+              onClick={() => hasModels && setCurrentView('dress-model')}
+            >
               {hasModels ? 'Dress Your Model' : 'Create Model First'}
             </button>
           </div>
