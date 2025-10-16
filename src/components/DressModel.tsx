@@ -20,23 +20,23 @@ interface DressModelProps {
 const BACKGROUNDS = [
   {
     id: 'studio',
-    name: 'Studio - Siva Pozadina',
+    name: 'Studio - Gray Background',
     emoji: '🎬',
-    description: 'Profesionalni studio sa sivom pozadinom',
+    description: 'Professional studio with gray background',
     prompt: 'professional photography studio with solid gray background, studio lighting, professional fashion shoot'
   },
   {
     id: 'street',
-    name: 'Pešačka Zona - Ulica',
+    name: 'Urban Street',
     emoji: '🏙️',
-    description: 'Gradska pešačka zona',
+    description: 'City pedestrian zone',
     prompt: 'urban city street pedestrian zone, modern city background, outdoor fashion shoot, natural daylight'
   },
   {
     id: 'runway',
-    name: 'Modna Pista',
+    name: 'Fashion Runway',
     emoji: '✨',
-    description: 'Fashion runway',
+    description: 'Fashion runway show',
     prompt: 'fashion runway show, catwalk, professional fashion show lighting, runway background'
   }
 ]
@@ -254,17 +254,17 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
 
   return (
     <div className="dashboard">
-      <header className="dashboard-header">
-        <div className="dashboard-header-content">
-          <div>
-            <h1 className="dashboard-title">Generiši AI modela</h1>
-            <p className="dashboard-user">Dodajte odeću, aksesoare i druge elemente i opišite modela koga želite da vidite.</p>
+        <header className="dashboard-header">
+          <div className="dashboard-header-content">
+            <div>
+              <h1 className="dashboard-title">Dress Your Model</h1>
+              <p className="dashboard-user">Add clothing items and select a background to create professional fashion photos.</p>
+            </div>
+            <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
+              ← Back to Home
+            </button>
           </div>
-          <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
-            ← Nazad na početnu
-          </button>
-        </div>
-      </header>
+        </header>
 
       <main className="dashboard-content">
         {error && (
@@ -354,7 +354,7 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
               marginBottom: '8px',
               color: '#1a202c'
             }}>
-              Odeća (do 5 slika)
+              Clothing (up to 5 images)
             </label>
             
             <div style={{
@@ -440,7 +440,7 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
                   }}>
                     <div style={{fontSize: '32px', marginBottom: '5px'}}>+</div>
                     <div style={{fontSize: '11px', color: '#718096', fontWeight: '600'}}>
-                      Dodaj još
+                      Add More
                     </div>
                   </div>
                   <input
@@ -455,7 +455,7 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
             </div>
             
             <p style={{fontSize: '13px', color: '#718096', margin: '0'}}>
-              ili prevuci slike ovde
+              or drag images here
             </p>
           </div>
 
@@ -468,7 +468,7 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
               marginBottom: '12px',
               color: '#1a202c'
             }}>
-              Opišite modela
+              Select Background
             </label>
             
             <div style={{
@@ -556,7 +556,7 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
                   transition: 'all 0.3s'
                 }}
               >
-                {loading ? '⏳ Generišem...' : '🎨 Generiši Sliku'}
+                {loading ? '⏳ Generating...' : '🎨 Generate Image'}
               </button>
             ) : (
               <>
@@ -617,7 +617,7 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
                     e.currentTarget.style.color = '#667eea'
                   }}
                 >
-                  🔄 Generiši Novo
+                  🔄 Generate New
                 </button>
               </>
             )}
@@ -634,8 +634,8 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
               textAlign: 'center'
             }}>
               <p style={{margin: 0, fontSize: '14px', color: '#92400e'}}>
-                💡 <strong>Vaš generisani model će se pojaviti ovde.</strong><br/>
-                <em>Vreme potrebno za generisanje slike je 15-45 sekundi.</em>
+                💡 <strong>Your generated model will appear here.</strong><br/>
+                <em>Generation time: 15-45 seconds.</em>
               </p>
             </div>
           )}
