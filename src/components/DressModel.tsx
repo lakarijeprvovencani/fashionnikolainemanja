@@ -38,13 +38,6 @@ const BACKGROUNDS = [
     emoji: '✨',
     description: 'Fashion runway show',
     prompt: 'fashion runway show, catwalk, professional fashion show lighting, runway background'
-  },
-  {
-    id: 'custom',
-    name: 'Custom Background',
-    emoji: '🎨',
-    description: 'Describe your own background',
-    prompt: '' // Will be filled by user input
   }
 ]
 
@@ -55,7 +48,6 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
   const [clothingImages, setClothingImages] = useState<File[]>([])
   const [previewUrls, setPreviewUrls] = useState<string[]>([])
   const [selectedBackground, setSelectedBackground] = useState<string>('studio')
-  const [customBackgroundPrompt, setCustomBackgroundPrompt] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -127,21 +119,12 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
       return
     }
     
-    // Validate custom background prompt if custom is selected
-    if (selectedBackground === 'custom' && !customBackgroundPrompt.trim()) {
-      setError('Please describe your custom background')
-      return
-    }
-    
     setLoading(true)
     setError('')
     setSuccess(false)
     
     try {
-      // Use custom prompt if custom background is selected, otherwise use preset
-      const backgroundPrompt = selectedBackground === 'custom' 
-        ? customBackgroundPrompt.trim()
-        : BACKGROUNDS.find(bg => bg.id === selectedBackground)?.prompt || ''
+      const backgroundPrompt = BACKGROUNDS.find(bg => bg.id === selectedBackground)?.prompt || ''
       
       const imageUrl = await generateDressedModel({
         modelImageUrl: selectedModel.model_image_url,
@@ -537,47 +520,6 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
                 </div>
               ))}
             </div>
-            
-            {/* Custom Background Input - Shows when custom is selected */}
-            {selectedBackground === 'custom' && (
-              <div style={{marginTop: '15px'}}>
-                <textarea
-                  value={customBackgroundPrompt}
-                  onChange={(e) => setCustomBackgroundPrompt(e.target.value)}
-                  placeholder="Describe your custom background... (e.g., 'sunset beach with palm trees', 'modern office space', 'mountain landscape with snow')"
-                  rows={4}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px solid #667eea',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontFamily: 'inherit',
-                    resize: 'vertical',
-                    outline: 'none',
-                    transition: 'all 0.3s',
-                    background: '#f0f4ff',
-                    color: '#1a202c'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#764ba2'
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)'
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#667eea'
-                    e.currentTarget.style.boxShadow = 'none'
-                  }}
-                />
-                <p style={{
-                  margin: '8px 0 0 0',
-                  fontSize: '12px',
-                  color: '#718096',
-                  fontStyle: 'italic'
-                }}>
-                  💡 Tip: Be specific and descriptive for best results
-                </p>
-              </div>
-            )}
           </div>
 
           {/* Generate Button - Only show when no image generated */}
@@ -691,8 +633,6 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
                       setClothingImages([])
                       setPreviewUrls([])
                       setSuccess(false)
-                      setCustomBackgroundPrompt('')
-                      setSelectedBackground('studio')
                     }}
                     style={{
                       padding: '14px 32px',
