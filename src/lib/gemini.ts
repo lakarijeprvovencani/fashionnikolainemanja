@@ -202,32 +202,40 @@ export const generateDressedModel = async (options: DressModelOptions): Promise<
       ? 'the clothing item shown'
       : `the ${clothingImages.length} clothing items shown`
     
-    const prompt = `Use the EXACT model from the first image. Dress them in ${clothingDescription} from the following images.
+    const prompt = `CRITICAL: Use the EXACT SAME person/model from the first image provided. Do NOT create a new model or change the person's appearance.
 
-Keep the model identical (same face, body, skin tone, hair, ethnicity). Only change the clothing and background to: ${backgroundPrompt}
+Take the model from the first image and dress them in ${clothingDescription} in the other image(s). The setting should be: ${backgroundPrompt}.
 
-Professional fashion photography, full body shot, high quality.`
+STRICT REQUIREMENTS:
+- Use the EXACT SAME model/person from the first image (face, body, ethnicity, everything must be identical)
+- Only change: the clothing and the background
+- The model MUST look exactly like in the first image
+- Apply the clothing items from the other images onto THIS SPECIFIC model
+- Keep the model's pose natural for fashion photography
+- Background: ${backgroundPrompt}
+- Professional fashion photography lighting
+- High resolution, photorealistic quality
+- Full body shot from head to toes
+
+DO NOT generate a different person. Use the model from the first image and dress them in the provided clothing.`
 
     console.log('Generating dressed model with SAME model constraint')
     console.log('Model image URL:', modelImageUrl)
     console.log('Number of clothing images:', clothingImages.length)
-    console.log('Background prompt:', backgroundPrompt)
-    console.log('Full prompt:', prompt)
     
-    // Prepare parts for the API call - MODEL IMAGE FIRST, then prompt, then clothing
+    // Prepare parts for the API call - MODEL IMAGE FIRST (crucial!)
     const parts: any[] = [
-      // 1. MODEL IMAGE FIRST (this is the reference)
+      { text: prompt },
+      // Add the original model image FIRST
       {
         inlineData: {
           mimeType: modelImageFile.type,
           data: modelImageBase64.split(',')[1]
         }
-      },
-      // 2. Then the prompt explaining what to do
-      { text: prompt }
+      }
     ]
     
-    // 3. Add clothing images AFTER
+    // Add clothing images AFTER the model image
     clothingBase64Array.forEach((base64Image, index) => {
       parts.push({
         inlineData: {
@@ -238,7 +246,7 @@ Professional fashion photography, full body shot, high quality.`
     })
     
     // System instruction
-    const systemInstructionText = `You are a fashion photography AI. Use the model from the first image and dress them in new clothing. Keep the model's identity identical - same person, face, and body. Only change the outfit and background.`
+    const systemInstructionText = `You are an AI fashion stylist. Your CRITICAL task is to take the EXACT model from the first image and dress them in the clothing items shown in the subsequent images. You MUST NOT create a new model or change the person's appearance. The model's identity (face, body, ethnicity, features) must remain IDENTICAL to the first image. Only the clothing and background should change.`
     
     // API call using gemini-2.5-flash-image
     const response = await ai.models.generateContent({
