@@ -202,63 +202,32 @@ export const generateDressedModel = async (options: DressModelOptions): Promise<
       ? 'the clothing item shown'
       : `the ${clothingImages.length} clothing items shown`
     
-    const prompt = `‼️ CRITICAL INSTRUCTION - THIS IS MANDATORY ‼️
+    const prompt = `Use the EXACT model from the first image. Dress them in ${clothingDescription} from the following images.
 
-YOU MUST USE THE EXACT SAME PERSON FROM THE FIRST IMAGE. 
-DO NOT CREATE A NEW MODEL. DO NOT GENERATE A DIFFERENT PERSON.
-DO NOT CHANGE THE MODEL'S IDENTITY IN ANY WAY.
+Keep the model identical (same face, body, skin tone, hair, ethnicity). Only change the clothing and background to: ${backgroundPrompt}
 
-TASK:
-Take the EXACT model/person shown in the first image and dress them in ${clothingDescription} from the other image(s).
-
-ABSOLUTE REQUIREMENTS (MUST FOLLOW):
-1. ✅ USE THE SAME FACE from the first image - identical facial features, skin tone, ethnicity
-2. ✅ USE THE SAME BODY from the first image - identical body type, proportions, posture
-3. ✅ USE THE SAME PERSON from the first image - this person must be recognizable as the same individual
-4. ✅ ONLY CHANGE: the clothing and the background
-5. ✅ KEEP: everything else about the model identical
-
-WHAT TO CHANGE:
-- Clothing: Dress the model in ${clothingDescription}
-- Background: ${backgroundPrompt}
-- Lighting: Professional fashion photography lighting
-- Pose: Natural fashion photography pose (full body, head to toes visible)
-
-WHAT MUST STAY THE SAME:
-- Face (100% identical)
-- Body type (100% identical)  
-- Skin tone (100% identical)
-- Hair (same style and color)
-- Ethnicity (100% identical)
-- Gender (100% identical)
-- Age (same appearance)
-- Overall identity (same person)
-
-OUTPUT REQUIREMENTS:
-- High resolution, photorealistic quality
-- Full body shot showing complete outfit
-- Professional fashion photography style
-- The model MUST be recognizably the SAME person from the first image
-
-⚠️ REMINDER: This is the user's model. You MUST use their model. Do NOT create a different person. ⚠️`
+Professional fashion photography, full body shot, high quality.`
 
     console.log('Generating dressed model with SAME model constraint')
     console.log('Model image URL:', modelImageUrl)
     console.log('Number of clothing images:', clothingImages.length)
+    console.log('Background prompt:', backgroundPrompt)
+    console.log('Full prompt:', prompt)
     
-    // Prepare parts for the API call - MODEL IMAGE FIRST (crucial!)
+    // Prepare parts for the API call - MODEL IMAGE FIRST, then prompt, then clothing
     const parts: any[] = [
-      { text: prompt },
-      // Add the original model image FIRST
+      // 1. MODEL IMAGE FIRST (this is the reference)
       {
         inlineData: {
           mimeType: modelImageFile.type,
           data: modelImageBase64.split(',')[1]
         }
-      }
+      },
+      // 2. Then the prompt explaining what to do
+      { text: prompt }
     ]
     
-    // Add clothing images AFTER the model image
+    // 3. Add clothing images AFTER
     clothingBase64Array.forEach((base64Image, index) => {
       parts.push({
         inlineData: {
@@ -268,30 +237,8 @@ OUTPUT REQUIREMENTS:
       })
     })
     
-    // System instruction - EXTREMELY EXPLICIT
-    const systemInstructionText = `You are an AI fashion stylist with ONE CRITICAL RULE: 
-
-NEVER CREATE A NEW MODEL. NEVER GENERATE A DIFFERENT PERSON.
-
-Your ONLY job is to take the EXACT person shown in the first image and change their clothing and background. This is NOT a request to create a similar-looking person. This is a REQUIREMENT to use the SAME EXACT person.
-
-The person in the output image must be 100% IDENTICAL to the person in the first image:
-- Same face (every facial feature identical)
-- Same body (exact body type and proportions)
-- Same skin tone
-- Same ethnicity
-- Same gender
-- Same hair
-- Same age appearance
-
-You are ONLY allowed to change:
-1. The clothing (apply new outfit)
-2. The background (change setting)
-3. The lighting and pose (for professional photography)
-
-Everything else MUST remain IDENTICAL. The user selected a specific model from their database. You MUST use that exact model. Creating a different person is NOT acceptable and will be considered a failure.
-
-IDENTITY PRESERVATION IS MANDATORY.`
+    // System instruction
+    const systemInstructionText = `You are a fashion photography AI. Use the model from the first image and dress them in new clothing. Keep the model's identity identical - same person, face, and body. Only change the outfit and background.`
     
     // API call using gemini-2.5-flash-image
     const response = await ai.models.generateContent({
