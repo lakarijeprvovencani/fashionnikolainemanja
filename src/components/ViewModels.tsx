@@ -153,6 +153,38 @@ const ViewModels: React.FC<ViewModelsProps> = ({ onBack, onSelectModel }) => {
 
               <div style={{display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px', flexWrap: 'wrap'}}>
                 <button 
+                  onClick={() => {
+                    // For now just show alert, will be used for "Dress Model" later
+                    alert(`Use This Model feature coming soon!\nModel: ${selectedModel.model_name}`)
+                  }}
+                  style={{
+                    width: 'auto',
+                    padding: '14px 32px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '15px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.6)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+                  }}
+                >
+                  👗 Use This Model
+                </button>
+                
+                <button 
                   className="btn btn-primary"
                   onClick={() => {
                     // Download image
