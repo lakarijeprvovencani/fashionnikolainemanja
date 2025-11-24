@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { generateFashionModel, generateModelFromUploadedImage } from '../lib/gemini'
-import TokenCounter from './TokenCounter'
 
 interface CreateModelProps {
   onBack?: () => void
@@ -204,12 +203,9 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack, onViewModels }) => {
             <h1 className="dashboard-title">Create Model</h1>
             <p className="dashboard-user">Create your fashion model</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <TokenCounter />
-            <button onClick={onBack || (() => window.history.back())} className="btn-signout" style={{background: '#667eea'}}>
-              Back to Dashboard
-            </button>
-          </div>
+          <button onClick={onBack || (() => window.history.back())} className="btn-signout" style={{background: '#667eea'}}>
+            Back to Dashboard
+          </button>
         </div>
       </header>
 

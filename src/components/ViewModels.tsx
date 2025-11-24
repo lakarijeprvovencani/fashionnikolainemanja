@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import TokenCounter from './TokenCounter'
 
 interface FashionModel {
   id: string
@@ -109,14 +108,12 @@ const ViewModels: React.FC<ViewModelsProps> = ({ onBack, onSelectModel }) => {
               <h1 className="dashboard-title">{selectedModel.model_name}</h1>
               <p className="dashboard-user">Model Details</p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <TokenCounter />
-              <button 
-                onClick={() => setSelectedModel(null)} 
-                className="btn-signout" 
-                style={{background: '#667eea'}}
-              >
-                Back to List
+            <button 
+              onClick={() => setSelectedModel(null)} 
+              className="btn-signout" 
+              style={{background: '#667eea'}}
+            >
+              Back to List
               </button>
             </div>
           </div>
@@ -226,14 +223,12 @@ const ViewModels: React.FC<ViewModelsProps> = ({ onBack, onSelectModel }) => {
             <h1 className="dashboard-title">Your Models</h1>
             <p className="dashboard-user">{models.length} model{models.length !== 1 ? 's' : ''} created</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <TokenCounter />
-            <button 
-              onClick={onBack || (() => window.history.back())} 
-              className="btn-signout" 
-              style={{background: '#667eea'}}
-            >
-              Back to Dashboard
+          <button 
+            onClick={onBack || (() => window.history.back())} 
+            className="btn-signout" 
+            style={{background: '#667eea'}}
+          >
+            Back to Dashboard
             </button>
           </div>
         </div>

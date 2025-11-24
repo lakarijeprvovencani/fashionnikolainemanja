@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { subscriptions } from '../lib/supabase'
+import UserMenu from './UserMenu'
 
 interface PricingProps {
   onBack?: () => void
   onSuccess?: () => void
+  onNavigate?: (view: string) => void
 }
 
-const Pricing: React.FC<PricingProps> = ({ onBack, onSuccess }) => {
+const Pricing: React.FC<PricingProps> = ({ onBack, onSuccess, onNavigate }) => {
   const { user } = useAuth()
   const [plans, setPlans] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -112,11 +114,14 @@ const Pricing: React.FC<PricingProps> = ({ onBack, onSuccess }) => {
             <h1 className="dashboard-title">Choose Your Plan</h1>
             <p className="dashboard-user">Select the perfect plan for your creative needs</p>
           </div>
-          {onBack && (
-            <button onClick={onBack} className="btn-signout" style={{ background: '#667eea' }}>
-              ← Back
-            </button>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            {onBack && (
+              <button onClick={onBack} className="btn-signout" style={{ background: '#667eea' }}>
+                ← Back
+              </button>
+            )}
+            {onNavigate && <UserMenu onNavigate={onNavigate} />}
+          </div>
         </div>
       </header>
 

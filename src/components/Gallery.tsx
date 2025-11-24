@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { dressedModels, storage } from '../lib/supabase'
-import TokenCounter from './TokenCounter'
 
 interface DressedModel {
   id: string
@@ -91,12 +90,9 @@ const Gallery: React.FC<GalleryProps> = ({ onBack }) => {
             <h1 className="dashboard-title">My Gallery</h1>
             <p className="dashboard-user">Your saved dressed models collection</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <TokenCounter />
-            <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
-              ← Back to Home
-            </button>
-          </div>
+          <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
+            ← Back to Home
+          </button>
         </div>
       </header>
 

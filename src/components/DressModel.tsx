@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase, storage, dressedModels } from '../lib/supabase'
 import { generateDressedModel } from '../lib/gemini'
-import TokenCounter from './TokenCounter'
 
 interface FashionModel {
   id: string
@@ -203,12 +202,9 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
               <h1 className="dashboard-title">Select Model</h1>
               <p className="dashboard-user">Choose a model to dress</p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <TokenCounter />
-              <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
-                ← Back
-              </button>
-            </div>
+            <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
+              ← Back
+            </button>
           </div>
         </header>
 
@@ -306,12 +302,9 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
               <h1 className="dashboard-title">Dress Your Model</h1>
               <p className="dashboard-user">Add clothing items and select a background to create professional fashion photos.</p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <TokenCounter />
-              <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
-                ← Back to Home
-              </button>
-            </div>
+            <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
+              ← Back to Home
+            </button>
           </div>
         </header>
 
