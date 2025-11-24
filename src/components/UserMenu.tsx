@@ -33,122 +33,92 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div style={{ position: 'relative' }} ref={menuRef}>
-      {/* User Avatar Button */}
+    <div style={{ position: 'relative', fontFamily: '"Inter", sans-serif' }} ref={menuRef}>
+      {/* User Avatar Button - Minimalist */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '10px',
-          padding: '8px 12px',
-          background: 'white',
-          border: '1px solid #e2e8f0',
-          borderRadius: '12px',
+          gap: '12px',
+          padding: '6px 12px',
+          background: 'transparent',
+          border: '1px solid transparent',
+          borderRadius: '0px',
           cursor: 'pointer',
-          transition: 'all 0.2s',
-          boxShadow: isOpen ? '0 4px 12px rgba(0,0,0,0.15)' : '0 2px 4px rgba(0,0,0,0.1)'
+          transition: 'all 0.2s'
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = '#cbd5e0'
-          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+          e.currentTarget.style.background = '#f9f9f9'
         }}
         onMouseLeave={(e) => {
           if (!isOpen) {
-            e.currentTarget.style.borderColor = '#e2e8f0'
-            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+            e.currentTarget.style.background = 'transparent'
           }
         }}
       >
-        {/* Avatar Circle */}
-        <div style={{
-          width: '36px',
-          height: '36px',
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-          fontWeight: '700',
-          fontSize: '14px',
-          flexShrink: 0
-        }}>
-          {user?.email?.charAt(0).toUpperCase() || 'U'}
-        </div>
-        
         {/* Email */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'flex-start',
-          textAlign: 'left'
+          alignItems: 'flex-end',
+          textAlign: 'right'
         }}>
           <span style={{
-            fontSize: '13px',
+            fontSize: '12px',
             fontWeight: '600',
-            color: '#1a202c',
-            lineHeight: '1.2'
+            color: '#000',
+            lineHeight: '1.2',
+            letterSpacing: '0.5px'
           }}>
             {user?.email?.split('@')[0] || 'User'}
           </span>
-          <span style={{
-            fontSize: '11px',
-            color: '#718096',
-            lineHeight: '1.2'
-          }}>
-            {user?.email || ''}
-          </span>
         </div>
 
-        {/* Dropdown Icon */}
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          style={{
-            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s',
-            flexShrink: 0
-          }}
-        >
-          <path
-            d="M4 6L8 10L12 6"
-            stroke="#718096"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        {/* Avatar Circle - Black & White */}
+        <div style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '50%',
+          background: '#000',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          fontWeight: '500',
+          fontSize: '12px',
+          flexShrink: 0
+        }}>
+          {user?.email?.charAt(0).toUpperCase() || 'U'}
+        </div>
       </button>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu - Sharp & Clean */}
       {isOpen && (
         <div style={{
           position: 'absolute',
-          top: 'calc(100% + 8px)',
+          top: 'calc(100% + 10px)',
           right: 0,
           background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-          border: '1px solid #e2e8f0',
-          minWidth: '280px',
+          borderRadius: '0px', // Sharp corners
+          boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+          border: '1px solid #e0e0e0',
+          minWidth: '300px',
           zIndex: 1000,
           overflow: 'hidden',
           animation: 'slideDown 0.2s ease-out'
         }}>
           {/* Token Counter Section */}
           <div style={{
-            padding: '16px',
-            borderBottom: '1px solid #e2e8f0',
-            background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)'
+            padding: '20px',
+            borderBottom: '1px solid #f0f0f0',
+            background: '#fff'
           }}>
             <TokenCounter />
           </div>
 
           {/* Menu Items */}
-          <div style={{ padding: '8px' }}>
+          <div style={{ padding: '10px 0' }}>
             <button
               onClick={() => {
                 onNavigate('subscription')
@@ -156,32 +126,28 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
               }}
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '12px 20px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
                 background: 'transparent',
                 border: 'none',
-                borderRadius: '8px',
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#1a202c',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#333',
                 textAlign: 'left',
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f7fafc'
-                e.currentTarget.style.color = '#667eea'
+                e.currentTarget.style.background = '#f9f9f9'
+                e.currentTarget.style.color = '#000'
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.color = '#1a202c'
+                e.currentTarget.style.color = '#333'
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-              </svg>
               My Subscription
             </button>
 
@@ -192,71 +158,63 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
               }}
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '12px 20px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
                 background: 'transparent',
                 border: 'none',
-                borderRadius: '8px',
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#1a202c',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#333',
                 textAlign: 'left',
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f7fafc'
-                e.currentTarget.style.color = '#667eea'
+                e.currentTarget.style.background = '#f9f9f9'
+                e.currentTarget.style.color = '#000'
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.color = '#1a202c'
+                e.currentTarget.style.color = '#333'
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
               Pricing Plans
             </button>
 
             <div style={{
               height: '1px',
-              background: '#e2e8f0',
-              margin: '8px 0'
+              background: '#f0f0f0',
+              margin: '10px 0'
             }} />
 
             <button
               onClick={handleSignOut}
               style={{
                 width: '100%',
-                padding: '12px 16px',
+                padding: '12px 20px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
                 background: 'transparent',
                 border: 'none',
-                borderRadius: '8px',
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#e53e3e',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#999',
                 textAlign: 'left',
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#fff5f5'
-                e.currentTarget.style.color = '#c53030'
+                e.currentTarget.style.background = '#f9f9f9'
+                e.currentTarget.style.color = '#000'
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.color = '#e53e3e'
+                e.currentTarget.style.color = '#999'
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
-              </svg>
               Sign Out
             </button>
           </div>
@@ -281,4 +239,3 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
 }
 
 export default UserMenu
-

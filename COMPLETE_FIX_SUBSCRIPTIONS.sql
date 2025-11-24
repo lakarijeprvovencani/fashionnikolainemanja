@@ -47,3 +47,4 @@ WHERE table_name = 'subscriptions'
   )
 ORDER BY column_name;
 
+

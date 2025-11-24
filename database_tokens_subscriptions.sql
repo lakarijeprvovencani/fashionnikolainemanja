@@ -148,3 +148,4 @@ CREATE POLICY "Anyone can view subscription plans"
     TO public
     USING (is_active = true);
 
+

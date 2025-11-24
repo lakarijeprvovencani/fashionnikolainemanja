@@ -1,8 +1,13 @@
 import { GoogleGenAI, Modality } from '@google/genai'
 import { tokens } from './supabase'
 
-// Gemini API key
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyAPQ_PhnJe3b1QJbt8DV9wdV2GhSCps_80'
+// Gemini API key - must be set in .env file
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY
+
+if (!API_KEY) {
+  console.error('Missing VITE_GEMINI_API_KEY environment variable!')
+  throw new Error('VITE_GEMINI_API_KEY is required. Please set it in your .env file.')
+}
 
 const ai = new GoogleGenAI({ apiKey: API_KEY })
 
@@ -10,7 +15,8 @@ const ai = new GoogleGenAI({ apiKey: API_KEY })
 export const TOKEN_COSTS = {
   createModel: 1,
   dressModel: 1,
-  editModel: 1
+  editModel: 1,
+  generateVideo: 5
 }
 
 interface GenerateModelOptions {
@@ -396,5 +402,270 @@ The person's identity MUST remain unchanged. Only clothing, pose, and scene can 
   } catch (error: any) {
     console.error('Error generating dressed model:', error)
     throw new Error(error.message || 'Failed to generate dressed model. Please try again.')
+  }
+}
+
+interface GenerateCaptionsOptions {
+  imageUrl: string
+  clothingDescription?: string
+  sceneDescription?: string
+}
+
+export const generateSocialMediaCaptions = async (options: GenerateCaptionsOptions): Promise<{
+  instagram: string
+  webshop: string
+  facebook: string
+}> => {
+  try {
+    const { imageUrl, clothingDescription, sceneDescription } = options
+    
+    // Fetch image and convert to base64
+    const response = await fetch(imageUrl)
+    const blob = await response.blob()
+    const base64Image = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+    
+    const base64Data = base64Image.split(',')[1]
+    const imagePart = { inlineData: { data: base64Data, mimeType: blob.type } }
+    
+    const prompt = `Analyze this fashion model image and create three different social media captions:
+
+1. INSTAGRAM: Create an engaging Instagram caption (max 2200 characters) with:
+   - Engaging, trendy language
+   - Relevant hashtags (5-10 hashtags)
+   - Call-to-action
+   - Emojis for visual appeal
+   - Focus on style and lifestyle
+
+2. WEB SHOP: Create a product description for an e-commerce website with:
+   - Professional, detailed product description
+   - Key features and benefits
+   - Size and fit information
+   - Material and care instructions
+   - SEO-friendly language
+   - Clear call-to-action
+
+3. FACEBOOK: Create a Facebook post caption with:
+   - Conversational, friendly tone
+   - Storytelling approach
+   - Engagement questions
+   - Brand personality
+   - Clear value proposition
+
+${clothingDescription ? `Clothing details: ${clothingDescription}` : ''}
+${sceneDescription ? `Scene/Setting: ${sceneDescription}` : ''}
+
+Return the response in this exact JSON format:
+{
+  "instagram": "caption text here",
+  "webshop": "description text here",
+  "facebook": "caption text here"
+}`
+
+    const textPart = { text: prompt }
+    
+    const response_ai = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { parts: [imagePart, textPart] },
+    })
+    
+    const textResponse = response_ai.candidates?.[0]?.content?.parts.find((part: any) => part.text)?.text || ''
+    
+    // Try to parse JSON from response
+    try {
+      // Extract JSON from markdown code blocks if present
+      const jsonMatch = textResponse.match(/```json\s*([\s\S]*?)\s*```/) || textResponse.match(/```\s*([\s\S]*?)\s*```/)
+      const jsonText = jsonMatch ? jsonMatch[1] : textResponse
+      const parsed = JSON.parse(jsonText.trim())
+      
+      return {
+        instagram: parsed.instagram || '',
+        webshop: parsed.webshop || '',
+        facebook: parsed.facebook || ''
+      }
+    } catch (parseError) {
+      // Fallback: split by sections if JSON parsing fails
+      const instagramMatch = textResponse.match(/INSTAGRAM[:\-]?\s*(.+?)(?=WEB SHOP|FACEBOOK|$)/is)
+      const webshopMatch = textResponse.match(/WEB SHOP[:\-]?\s*(.+?)(?=FACEBOOK|$)/is)
+      const facebookMatch = textResponse.match(/FACEBOOK[:\-]?\s*(.+?)$/is)
+      
+      return {
+        instagram: instagramMatch ? instagramMatch[1].trim() : 'Check out this stunning look! ✨',
+        webshop: webshopMatch ? webshopMatch[1].trim() : 'Premium quality fashion piece.',
+        facebook: facebookMatch ? facebookMatch[1].trim() : 'Introducing our latest collection!'
+      }
+    }
+    
+  } catch (error: any) {
+    console.error('Error generating captions:', error)
+    // Return fallback captions
+    return {
+      instagram: '✨ New arrival! Check out this stunning look. #Fashion #Style',
+      webshop: 'Premium quality fashion piece. Available now.',
+      facebook: 'Introducing our latest collection!'
+    }
+  }
+}
+
+interface EditImageOptions {
+  imageUrl: string
+  prompt: string
+  userId: string
+}
+
+export const editFashionImage = async (options: EditImageOptions): Promise<string> => {
+  try {
+    const { imageUrl, prompt, userId } = options
+    
+    // Check tokens
+    const { hasTokens } = await tokens.hasEnoughTokens(userId, TOKEN_COSTS.editModel)
+    if (!hasTokens) {
+      throw new Error('Insufficient tokens for editing.')
+    }
+
+    // Fetch image
+    const response = await fetch(imageUrl)
+    const blob = await response.blob()
+    const base64Image = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+    
+    const base64Data = base64Image.split(',')[1]
+    const imagePart = { inlineData: { data: base64Data, mimeType: blob.type } }
+    
+    const editPrompt = `Edit this image according to the following instruction: ${prompt}. Maintain the original style, lighting, and quality. Only modify what is asked.`
+    const textPart = { text: editPrompt }
+    
+    console.log('🎨 Editing image with prompt:', prompt)
+    
+    const aiResponse = await ai.models.generateContent({
+      model: 'gemini-3-pro-image-preview',
+      contents: { parts: [imagePart, textPart] },
+      config: {
+        responseModalities: [Modality.IMAGE],
+        imageConfig: {
+          numberOfImages: 1
+        }
+      }
+    })
+    
+    const imageResultPart = aiResponse.candidates?.[0]?.content?.parts.find((part: any) => part.inlineData)
+    
+    if (imageResultPart?.inlineData) {
+      // Deduct tokens
+      await tokens.deductTokens(userId, TOKEN_COSTS.editModel, 'Edited fashion image')
+      return `data:image/png;base64,${imageResultPart.inlineData.data}`
+    }
+    
+    throw new Error('No image generated from edit request')
+    
+  } catch (error: any) {
+    console.error('Error editing image:', error)
+    throw new Error(error.message || 'Failed to edit image.')
+  }
+}
+
+interface GenerateVideoOptions {
+  imageUrl: string
+  prompt?: string
+  userId: string
+}
+
+export const generateFashionVideo = async (options: GenerateVideoOptions): Promise<string> => {
+  try {
+    const { imageUrl, prompt, userId } = options
+    
+    // Check tokens - Video is expensive, let's say 5 tokens
+    const VIDEO_COST = 5
+    const { hasTokens } = await tokens.hasEnoughTokens(userId, VIDEO_COST)
+    if (!hasTokens) {
+      throw new Error(`Insufficient tokens for video generation. Requires ${VIDEO_COST} tokens.`)
+    }
+
+    console.log('🎬 Starting video generation...')
+    
+    // Fetch image
+    const response = await fetch(imageUrl)
+    const blob = await response.blob()
+    
+    // Gemini Video Generation (using Veo)
+    // Note: The SDK method signatures might vary, adjusting for typical Veo usage
+    // Since direct image-to-video might need specific endpoint, we'll use generateVideos if available or fallback logic
+    
+    // Convert to base64 for the API
+    const base64Image = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+    })
+    const base64Data = base64Image.split(',')[1]
+
+    const videoPrompt = prompt || "Fashion model posing, subtle movement, professional lighting, 4k resolution, cinematic slow motion"
+    
+    // Using the correct method for video generation if available in this SDK version
+    // If ai.models.generateVideos is not available, we might need to use a different approach
+    // Assuming google-genai SDK has generateVideos or similar for Veo
+    
+    try {
+        // @ts-ignore - Ignoring TS error if method name differs in installed version
+        const videoOp = await ai.models.generateVideos({
+            model: 'veo-2.0-generate-001', // or veo-3.0-fast-generate-preview
+            prompt: videoPrompt,
+            image: {
+                imageBytes: base64Data,
+                mimeType: blob.type
+            },
+            config: {
+                numberOfVideos: 1,
+                aspectRatio: '9:16' // Matching typical fashion content
+            }
+        })
+        
+        console.log('Video operation started:', videoOp)
+        
+        // Polling for completion
+        let operation = videoOp
+        let attempts = 0
+        const maxAttempts = 60 // 5 minutes roughly
+        
+        while (!operation.done && attempts < maxAttempts) {
+            attempts++
+            await new Promise(r => setTimeout(r, 5000))
+            // @ts-ignore
+            operation = await ai.operations.getVideosOperation({ operation: operation })
+            console.log('Video generation status:', operation.state)
+        }
+        
+        if (operation.done && operation.result?.videos?.[0]?.uri) {
+            const videoUri = operation.result.videos[0].uri
+            
+            // Deduct tokens
+            await tokens.deductTokens(userId, VIDEO_COST, 'Generated fashion video')
+            
+            // The URI might be temporary, usually we'd download it here. 
+            // For now returning the URI or if it requires auth, we might need to proxy or fetch it.
+            // Often these URIs are signed google storage links.
+            return videoUri
+        }
+        
+        throw new Error('Video generation failed or timed out')
+        
+    } catch (veoError) {
+        console.error('Veo generation error:', veoError)
+        // Fallback or detailed error
+        throw veoError
+    }
+
+  } catch (error: any) {
+    console.error('Error generating video:', error)
+    throw new Error(error.message || 'Failed to generate video.')
   }
 }

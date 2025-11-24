@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { dressedModels, storage } from '../lib/supabase'
+import UserMenu from './UserMenu'
 
 interface DressedModel {
   id: string
@@ -16,9 +17,10 @@ interface DressedModel {
 
 interface GalleryProps {
   onBack?: () => void
+  onNavigate?: (view: string) => void
 }
 
-const Gallery: React.FC<GalleryProps> = ({ onBack }) => {
+const Gallery: React.FC<GalleryProps> = ({ onBack, onNavigate }) => {
   const { user } = useAuth()
   const [models, setModels] = useState<DressedModel[]>([])
   const [loading, setLoading] = useState(true)
@@ -82,299 +84,185 @@ const Gallery: React.FC<GalleryProps> = ({ onBack }) => {
     link.click()
   }
 
+  if (loading) {
+    return (
+      <div className="dashboard" style={{ background: '#fff', height: '100vh' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+          <div className="spinner" style={{ borderTopColor: '#000', borderLeftColor: '#000' }}></div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="dashboard">
-      <header className="dashboard-header">
-        <div className="dashboard-header-content">
+    <div className="dashboard" style={{ background: '#ffffff', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
+      <header className="dashboard-header" style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f0', padding: '20px 40px', height: '80px' }}>
+        <div className="dashboard-header-content" style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 className="dashboard-title">My Gallery</h1>
-            <p className="dashboard-user">Your saved dressed models collection</p>
+            <h1 className="dashboard-title" style={{ color: '#000', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '-0.5px', margin: 0 }}>Gallery</h1>
           </div>
-          <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
-            ← Back to Home
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <button onClick={onBack} className="btn-signout" style={{ background: 'transparent', color: '#000', border: '1px solid #e0e0e0', padding: '8px 16px', borderRadius: '0px', fontSize: '13px', cursor: 'pointer' }}>
+              ← Back
+            </button>
+            {onNavigate && <UserMenu onNavigate={onNavigate} />}
+          </div>
         </div>
       </header>
 
-      <main className="dashboard-content">
+      <main className="dashboard-content" style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto' }}>
         {error && (
-          <div className="alert alert-error" style={{marginBottom: '20px'}}>
+          <div style={{ padding: '15px', background: '#fff5f5', color: '#c53030', border: '1px solid #feb2b2', marginBottom: '30px' }}>
             {error}
           </div>
         )}
 
-        {loading ? (
-          <div style={{textAlign: 'center', padding: '60px 20px'}}>
-            <div className="spinner" style={{margin: '0 auto 20px'}}></div>
-            <p style={{color: '#718096'}}>Loading your gallery...</p>
-          </div>
-        ) : models.length === 0 ? (
-          <div className="welcome-card" style={{textAlign: 'center', padding: '60px 40px'}}>
-            <div style={{fontSize: '80px', marginBottom: '20px', opacity: 0.3}}>
-              🖼️
-            </div>
-            <h3 style={{
-              color: '#1a202c',
-              fontSize: '24px',
-              fontWeight: '700',
-              marginBottom: '12px'
-            }}>
-              Your Gallery is Empty
-            </h3>
-            <p style={{
-              color: '#718096',
-              fontSize: '16px',
-              maxWidth: '400px',
-              margin: '0 auto 30px',
-              lineHeight: '1.6'
-            }}>
-              Start creating dressed models and save them to your gallery to build your collection!
-            </p>
-            <button
+        {models.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '100px 0' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: '300', color: '#000', marginBottom: '20px' }}>Gallery Empty</h2>
+            <p style={{ color: '#666', marginBottom: '30px' }}>Your created photos will appear here.</p>
+            <button 
               onClick={onBack}
               style={{
-                padding: '14px 32px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
+                padding: '16px 40px',
+                background: '#000',
+                color: '#fff',
                 border: 'none',
-                borderRadius: '10px',
-                fontSize: '15px',
-                fontWeight: '700',
-                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '600',
                 textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
-                transition: 'all 0.3s'
+                letterSpacing: '1px',
+                cursor: 'pointer'
               }}
             >
-              Create Your First Model
+              Go to Studio
             </button>
           </div>
         ) : (
-          <>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '30px'
-            }}>
-              <h2 style={{
-                fontSize: '20px',
-                fontWeight: '700',
-                color: '#1a202c',
-                margin: 0
-              }}>
-                {models.length} {models.length === 1 ? 'Item' : 'Items'} in Gallery
-              </h2>
-            </div>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-              gap: '25px'
-            }}>
-              {models.map((item) => (
-                <div
-                  key={item.id}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '40px'
+          }}>
+            {models.map((item) => (
+              <div 
+                key={item.id}
+                style={{
+                  position: 'relative',
+                  transition: 'transform 0.2s',
+                  background: '#fff'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-5px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                <div 
+                  onClick={() => setSelectedImage(item.outfit_image_url)}
                   style={{
-                    background: 'white',
-                    borderRadius: '16px',
+                    aspectRatio: '9/16',
                     overflow: 'hidden',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-5px)'
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(102, 126, 234, 0.2)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
+                    background: '#f0f0f0',
+                    marginBottom: '15px',
+                    cursor: 'zoom-in',
+                    position: 'relative'
                   }}
                 >
-                  <div
-                    onClick={() => setSelectedImage(item.outfit_image_url)}
+                  <img 
+                    src={item.outfit_image_url} 
+                    alt="Generated Outfit" 
                     style={{
                       width: '100%',
-                      height: '400px',
-                      overflow: 'hidden',
-                      background: '#f7f8fc',
-                      position: 'relative'
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block'
                     }}
-                  >
-                    <img
-                      src={item.outfit_image_url}
-                      alt={item.outfit_description}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover'
-                      }}
-                    />
-                  </div>
-
-                  <div style={{padding: '20px'}}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      marginBottom: '12px'
-                    }}>
-                      <img
-                        src={item.fashion_models.model_image_url}
-                        alt={item.fashion_models.model_name}
-                        style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          objectFit: 'cover',
-                          border: '2px solid #667eea'
-                        }}
-                      />
-                      <div style={{flex: 1}}>
-                        <h4 style={{
-                          margin: '0 0 2px 0',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          color: '#1a202c'
-                        }}>
-                          {item.fashion_models.model_name}
-                        </h4>
-                        <p style={{
-                          margin: 0,
-                          fontSize: '12px',
-                          color: '#718096'
-                        }}>
-                          {new Date(item.created_at).toLocaleDateString('sr-RS')}
-                        </p>
-                      </div>
-                    </div>
-
-                    <p style={{
-                      margin: '0 0 15px 0',
-                      fontSize: '13px',
-                      color: '#4a5568',
-                      lineHeight: '1.5',
-                      maxHeight: '60px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical'
-                    }}>
-                      {item.outfit_description}
-                    </p>
-
-                    <div style={{
-                      display: 'flex',
-                      gap: '8px'
-                    }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDownload(item.outfit_image_url, item.fashion_models.model_name)
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: '10px 16px',
-                          background: 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        📥 Download
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDelete(item.id, item.outfit_image_url)
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: '10px 16px',
-                          background: 'white',
-                          color: '#e53e3e',
-                          border: '2px solid #e53e3e',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        🗑️ Delete
-                      </button>
-                    </div>
+                  />
+                  <div className="gallery-overlay" style={{
+                    position: 'absolute',
+                    bottom: 0, left: 0, right: 0,
+                    padding: '20px',
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.5), transparent)',
+                    opacity: 0,
+                    transition: 'opacity 0.2s'
+                  }}>
+                    <span style={{ color: '#fff', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px' }}>View Full Size</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ fontSize: '13px', fontWeight: '600', color: '#000', margin: 0 }}>{item.fashion_models?.model_name || 'Unknown Model'}</h3>
+                    <p style={{ fontSize: '11px', color: '#999', margin: '4px 0 0 0' }}>{new Date(item.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button 
+                      onClick={() => handleDownload(item.outfit_image_url, item.fashion_models?.model_name)}
+                      title="Download"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: '#000' }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(item.id, item.outfit_image_url)}
+                      title="Delete"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', color: '#999' }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#c53030'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#999'}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
-        {/* Image Preview Modal */}
+        {/* Lightbox Modal */}
         {selectedImage && (
-          <div
+          <div 
             onClick={() => setSelectedImage(null)}
             style={{
               position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0, 0, 0, 0.9)',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(255,255,255,0.95)',
+              zIndex: 2000,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 9999,
-              cursor: 'pointer',
-              padding: '20px'
+              padding: '40px',
+              cursor: 'zoom-out'
             }}
           >
-            <img
-              src={selectedImage}
-              alt="Preview"
+            <img 
+              src={selectedImage} 
+              alt="Full View" 
               style={{
-                maxWidth: '90%',
-                maxHeight: '90%',
-                borderRadius: '12px',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                maxHeight: '90vh',
+                maxWidth: '90vw',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
               }}
-              onClick={(e) => e.stopPropagation()}
             />
-            <button
-              onClick={() => setSelectedImage(null)}
-              style={{
-                position: 'absolute',
-                top: '30px',
-                right: '30px',
-                width: '50px',
-                height: '50px',
-                borderRadius: '50%',
-                background: 'white',
-                border: 'none',
-                fontSize: '24px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-              }}
-            >
-              ×
-            </button>
           </div>
         )}
       </main>
+
+      <style>{`
+        .gallery-overlay { opacity: 0; }
+        div:hover > div > .gallery-overlay { opacity: 1; }
+      `}</style>
     </div>
   )
 }
 
 export default Gallery
-
