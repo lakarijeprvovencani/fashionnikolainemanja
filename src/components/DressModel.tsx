@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
+import { supabase, storage, dressedModels } from '../lib/supabase'
 import { generateDressedModel } from '../lib/gemini'
+import TokenCounter from './TokenCounter'
 
 interface FashionModel {
   id: string
@@ -17,42 +18,20 @@ interface DressModelProps {
   preselectedModel?: FashionModel | null
 }
 
-const BACKGROUNDS = [
-  {
-    id: 'studio',
-    name: 'Studio - Gray Background',
-    emoji: '🎬',
-    description: 'Professional studio with gray background',
-    prompt: 'professional photography studio with solid gray background, studio lighting, professional fashion shoot'
-  },
-  {
-    id: 'street',
-    name: 'Urban Street',
-    emoji: '🏙️',
-    description: 'City pedestrian zone',
-    prompt: 'urban city street pedestrian zone, modern city background, outdoor fashion shoot, natural daylight'
-  },
-  {
-    id: 'runway',
-    name: 'Fashion Runway',
-    emoji: '✨',
-    description: 'Fashion runway show',
-    prompt: 'fashion runway show, catwalk, professional fashion show lighting, runway background'
-  }
-]
-
 const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => {
   const { user } = useAuth()
   const [models, setModels] = useState<FashionModel[]>([])
   const [selectedModel, setSelectedModel] = useState<FashionModel | null>(preselectedModel || null)
   const [clothingImages, setClothingImages] = useState<File[]>([])
   const [previewUrls, setPreviewUrls] = useState<string[]>([])
-  const [selectedBackground, setSelectedBackground] = useState<string>('studio')
+  const [scenePrompt, setScenePrompt] = useState<string>('professional photography studio with solid gray background, studio lighting')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [generatedImage, setGeneratedImage] = useState<string | null>(null)
   const [showModelSelector, setShowModelSelector] = useState(!preselectedModel)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     if (user && !preselectedModel) {
@@ -119,17 +98,26 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
       return
     }
     
+    if (!scenePrompt.trim()) {
+      setError('Please enter a scene description')
+      return
+    }
+    
     setLoading(true)
     setError('')
     setSuccess(false)
     
     try {
-      const backgroundPrompt = BACKGROUNDS.find(bg => bg.id === selectedBackground)?.prompt || ''
+      // Check if user is authenticated
+      if (!user?.id) {
+        throw new Error('You must be logged in to dress a model')
+      }
       
       const imageUrl = await generateDressedModel({
         modelImageUrl: selectedModel.model_image_url,
         clothingImages: clothingImages,
-        backgroundPrompt: backgroundPrompt
+        backgroundPrompt: scenePrompt,
+        userId: user.id
       })
       
       setGeneratedImage(imageUrl)
@@ -151,6 +139,61 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
     link.click()
   }
 
+  const handleSaveToGallery = async () => {
+    if (!generatedImage || !selectedModel || !user) {
+      setError('Cannot save: missing data')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+
+    try {
+      // Convert base64 to blob
+      const base64Data = generatedImage.split(',')[1]
+      const byteCharacters = atob(base64Data)
+      const byteNumbers = new Array(byteCharacters.length)
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      }
+      const byteArray = new Uint8Array(byteNumbers)
+      const blob = new Blob([byteArray], { type: 'image/png' })
+
+      // Generate unique filename
+      const fileName = `${user.id}/${selectedModel.id}/dressed-${Date.now()}.png`
+
+      // Upload to Supabase storage
+      const { url, error: uploadError } = await storage.uploadImage('dressed-models', fileName, blob)
+
+      if (uploadError || !url) {
+        throw new Error('Failed to upload image')
+      }
+
+      // Save to database
+      const { error: dbError } = await dressedModels.saveDressedModel({
+        userId: user.id,
+        modelId: selectedModel.id,
+        sceneDescription: scenePrompt,
+        imageUrl: url,
+        clothingData: {
+          clothingCount: clothingImages.length
+        }
+      })
+
+      if (dbError) {
+        throw new Error('Failed to save to database')
+      }
+
+      setSaved(true)
+      setSuccess(true)
+      setTimeout(() => setSaved(false), 3000) // Reset after 3 seconds
+    } catch (err: any) {
+      setError(err.message || 'Failed to save to gallery. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (showModelSelector && !selectedModel) {
     return (
       <div className="dashboard">
@@ -160,9 +203,12 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
               <h1 className="dashboard-title">Select Model</h1>
               <p className="dashboard-user">Choose a model to dress</p>
             </div>
-            <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
-              ← Back
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <TokenCounter />
+              <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
+                ← Back
+              </button>
+            </div>
           </div>
         </header>
 
@@ -260,9 +306,12 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
               <h1 className="dashboard-title">Dress Your Model</h1>
               <p className="dashboard-user">Add clothing items and select a background to create professional fashion photos.</p>
             </div>
-            <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
-              ← Back to Home
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <TokenCounter />
+              <button onClick={onBack} className="btn-signout" style={{background: '#667eea'}}>
+                ← Back to Home
+              </button>
+            </div>
           </div>
         </header>
 
@@ -466,60 +515,46 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
             </p>
           </div>
 
-          {/* Background Selection */}
+          {/* Scene Description */}
           <div style={{marginBottom: '30px'}}>
-            <label style={{
+            <label htmlFor="scene-prompt" style={{
               display: 'block',
               fontSize: '16px',
               fontWeight: '600',
-              marginBottom: '12px',
+              marginBottom: '8px',
               color: '#1a202c'
             }}>
-              Select Background
+              Scene Description
             </label>
-            
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '12px'
-            }}>
-              {BACKGROUNDS.map((bg) => (
-                <div
-                  key={bg.id}
-                  onClick={() => setSelectedBackground(bg.id)}
-                  style={{
-                    padding: '16px',
-                    border: selectedBackground === bg.id ? '2px solid #667eea' : '2px solid #e2e8f0',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s',
-                    background: selectedBackground === bg.id ? '#f0f4ff' : 'white',
-                    boxShadow: selectedBackground === bg.id ? '0 4px 12px rgba(102, 126, 234, 0.2)' : 'none'
-                  }}
-                >
-                  <div style={{fontSize: '32px', marginBottom: '8px', textAlign: 'center'}}>
-                    {bg.emoji}
-                  </div>
-                  <h4 style={{
-                    margin: '0 0 4px 0',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#1a202c',
-                    textAlign: 'center'
-                  }}>
-                    {bg.name}
-                  </h4>
-                  <p style={{
-                    margin: 0,
-                    fontSize: '12px',
-                    color: '#718096',
-                    textAlign: 'center'
-                  }}>
-                    {bg.description}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <textarea
+              id="scene-prompt"
+              value={scenePrompt}
+              onChange={(e) => setScenePrompt(e.target.value)}
+              placeholder="e.g., model wearing this outfit on a city street at sunset, walking on a fashion runway, in a professional studio with gray background..."
+              style={{
+                width: '100%',
+                minHeight: '100px',
+                padding: '12px 16px',
+                fontSize: '14px',
+                border: '2px solid #e2e8f0',
+                borderRadius: '12px',
+                resize: 'vertical',
+                fontFamily: 'inherit',
+                lineHeight: '1.5',
+                transition: 'border-color 0.3s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#667eea'
+                e.currentTarget.style.outline = 'none'
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#e2e8f0'
+              }}
+            />
+            <p style={{fontSize: '13px', color: '#718096', margin: '8px 0 0 0'}}>
+              💡 Describe where and how you want to see the model dressed in this outfit
+            </p>
           </div>
 
           {/* Generate Button - Only show when no image generated */}
@@ -527,10 +562,10 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
             <div style={{display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '20px'}}>
               <button
                 onClick={handleGenerate}
-                disabled={loading || !selectedModel || clothingImages.length === 0}
+                disabled={loading || !selectedModel || clothingImages.length === 0 || !scenePrompt.trim()}
                 style={{
                   padding: '14px 32px',
-                  background: loading || !selectedModel || clothingImages.length === 0
+                  background: loading || !selectedModel || clothingImages.length === 0 || !scenePrompt.trim()
                     ? '#cbd5e0'
                     : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   color: 'white',
@@ -538,7 +573,7 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
                   borderRadius: '10px',
                   fontSize: '15px',
                   fontWeight: '700',
-                  cursor: loading || !selectedModel || clothingImages.length === 0 ? 'not-allowed' : 'pointer',
+                  cursor: loading || !selectedModel || clothingImages.length === 0 || !scenePrompt.trim() ? 'not-allowed' : 'pointer',
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px',
                   boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
@@ -551,7 +586,7 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
           )}
 
           {/* Info Message */}
-          {selectedModel && clothingImages.length === 0 && !generatedImage && (
+          {selectedModel && (clothingImages.length === 0 || !scenePrompt.trim()) && !generatedImage && (
             <div style={{
               marginTop: '20px',
               padding: '15px',
@@ -561,8 +596,8 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
               textAlign: 'center'
             }}>
               <p style={{margin: 0, fontSize: '14px', color: '#92400e'}}>
-                💡 <strong>Your generated model will appear on the right.</strong><br/>
-                <em>Generation time: 15-45 seconds.</em>
+                💡 <strong>Upload clothing images and describe your desired scene.</strong><br/>
+                <em>Your generated model will appear on the right. Generation time: up to 30 seconds.</em>
               </p>
             </div>
           )}
@@ -597,8 +632,58 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
                   }}
                 />
                 
-                {/* Action Buttons - Download & Generate New */}
+                {/* Success message */}
+                {saved && (
+                  <div style={{
+                    marginBottom: '15px',
+                    padding: '12px',
+                    background: '#d1fae5',
+                    border: '1px solid #10b981',
+                    borderRadius: '8px',
+                    color: '#065f46',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    ✓ Saved to Gallery successfully!
+                  </div>
+                )}
+
+                {/* Action Buttons - Save, Download & Generate New */}
                 <div style={{display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap'}}>
+                  <button
+                    onClick={handleSaveToGallery}
+                    disabled={saving || saved}
+                    style={{
+                      padding: '14px 32px',
+                      background: saved 
+                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                        : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '15px',
+                      fontWeight: '700',
+                      cursor: saving || saved ? 'not-allowed' : 'pointer',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+                      transition: 'all 0.3s',
+                      opacity: saving ? 0.7 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!saving && !saved) {
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.6)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+                    }}
+                  >
+                    {saving ? '💾 Saving...' : saved ? '✓ Saved' : '💾 Save to Gallery'}
+                  </button>
+
                   <button
                     onClick={handleDownload}
                     style={{
@@ -624,14 +709,12 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
                       e.currentTarget.style.boxShadow = '0 4px 12px rgba(72, 187, 120, 0.4)'
                     }}
                   >
-                    📥 Download Image
+                    📥 Download
                   </button>
                   
                   <button
                     onClick={() => {
                       setGeneratedImage(null)
-                      setClothingImages([])
-                      setPreviewUrls([])
                       setSuccess(false)
                     }}
                     style={{
@@ -697,6 +780,9 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel }) => 
                     <div className="spinner" style={{margin: '0 auto'}}></div>
                     <p style={{color: '#667eea', fontWeight: '600', marginTop: '15px'}}>
                       Generating your model...
+                    </p>
+                    <p style={{color: '#718096', fontSize: '13px', marginTop: '8px'}}>
+                      ⏱️ This may take up to 30 seconds
                     </p>
                   </div>
                 )}

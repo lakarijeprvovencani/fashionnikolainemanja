@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { db } from '../lib/supabase'
+import { db, dressedModels } from '../lib/supabase'
 import CreateModel from './CreateModel'
 import ViewModels from './ViewModels'
 import DressModel from './DressModel'
+import Gallery from './Gallery'
+import TokenCounter from './TokenCounter'
+import SubscriptionDashboard from './SubscriptionDashboard'
+import Pricing from './Pricing'
 
 interface FashionModel {
   id: string
@@ -18,8 +22,9 @@ const Dashboard: React.FC = () => {
   const { user, signOut } = useAuth()
   const [hasModels, setHasModels] = useState(false)
   const [modelsCount, setModelsCount] = useState(0)
+  const [dressedModelsCount, setDressedModelsCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'dress-model' | 'view-models'>('dashboard')
+  const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'dress-model' | 'view-models' | 'gallery' | 'subscription' | 'pricing'>('dashboard')
   const [selectedModelForDressing, setSelectedModelForDressing] = useState<FashionModel | null>(null)
 
   const checkUserModels = async () => {
@@ -27,9 +32,11 @@ const Dashboard: React.FC = () => {
       try {
         const { data: hasModelsData } = await db.userHasModels(user.id)
         const { count } = await db.getUserModelsCount(user.id)
+        const { count: dressedCount } = await dressedModels.getDressedModelsCount(user.id)
         
         setHasModels(hasModelsData)
         setModelsCount(count)
+        setDressedModelsCount(dressedCount)
       } catch (error) {
         console.error('Error checking user models:', error)
       } finally {
@@ -91,6 +98,44 @@ const Dashboard: React.FC = () => {
     />
   }
 
+  if (currentView === 'gallery') {
+    return <Gallery onBack={() => setCurrentView('dashboard')} />
+  }
+
+  if (currentView === 'subscription') {
+    return (
+      <div className="dashboard">
+        <header className="dashboard-header">
+          <div className="dashboard-header-content">
+            <div>
+              <h1 className="dashboard-title">My Subscription</h1>
+              <p className="dashboard-user">{user?.email}</p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <TokenCounter onRefresh={() => checkUserModels()} />
+              <button onClick={() => setCurrentView('dashboard')} className="btn-signout" style={{ background: '#667eea' }}>
+                ← Back
+              </button>
+            </div>
+          </div>
+        </header>
+        <main className="dashboard-content">
+          <SubscriptionDashboard onUpgrade={() => setCurrentView('pricing')} />
+        </main>
+      </div>
+    )
+  }
+
+  if (currentView === 'pricing') {
+    return <Pricing 
+      onBack={() => setCurrentView('dashboard')}
+      onSuccess={() => {
+        checkUserModels()
+        setCurrentView('subscription')
+      }}
+    />
+  }
+
   return (
     <div className="dashboard">
       <header className="dashboard-header">
@@ -99,9 +144,12 @@ const Dashboard: React.FC = () => {
             <h1 className="dashboard-title">Fashion Model Creator</h1>
             <p className="dashboard-user">Welcome back, {user?.email}</p>
           </div>
-          <button onClick={handleSignOut} className="btn-signout">
-            Sign Out
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <TokenCounter onRefresh={() => checkUserModels()} />
+            <button onClick={handleSignOut} className="btn-signout">
+              Sign Out
+            </button>
+          </div>
         </div>
       </header>
 
@@ -155,6 +203,66 @@ const Dashboard: React.FC = () => {
               {hasModels ? 'Dress Your Model' : 'Create Model First'}
             </button>
           </div>
+
+          <div className="action-card">
+            <div className="action-card-icon" style={{background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'}}>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h3>My Gallery</h3>
+            <p>
+              {dressedModelsCount > 0 
+                ? `View your collection (${dressedModelsCount} saved model${dressedModelsCount > 1 ? 's' : ''})`
+                : 'Your saved dressed models will appear here'
+              }
+            </p>
+            <button 
+              className="btn-action" 
+              style={{background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'}}
+              onClick={() => setCurrentView('gallery')}
+            >
+              View Gallery
+            </button>
+          </div>
+
+          <div className="action-card">
+            <div className="action-card-icon" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+              </svg>
+            </div>
+            <h3>My Subscription</h3>
+            <p>
+              View your plan, token usage, and billing details
+            </p>
+            <button 
+              className="btn-action" 
+              style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}
+              onClick={() => setCurrentView('subscription')}
+            >
+              View Subscription
+            </button>
+          </div>
+
+          <div className="action-card">
+            <div className="action-card-icon" style={{background: 'linear-gradient(135deg, #f6ad55 0%, #ed8936 100%)'}}>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3>Upgrade Plan</h3>
+            <p>
+              Get more tokens and unlock premium features
+            </p>
+            <button 
+              className="btn-action" 
+              style={{background: 'linear-gradient(135deg, #f6ad55 0%, #ed8936 100%)'}}
+              onClick={() => setCurrentView('pricing')}
+            >
+              View Pricing
+            </button>
+          </div>
         </div>
 
         {hasModels && (
@@ -170,8 +278,8 @@ const Dashboard: React.FC = () => {
                 <div className="stat-label">Completed</div>
               </div>
               <div className="stat-item">
-                <div className="stat-value">0</div>
-                <div className="stat-label">Dressed Models</div>
+                <div className="stat-value">{dressedModelsCount}</div>
+                <div className="stat-label">Gallery Items</div>
               </div>
             </div>
             <div style={{textAlign: 'center', marginTop: '20px'}}>

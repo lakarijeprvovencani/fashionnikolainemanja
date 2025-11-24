@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { generateFashionModel, generateModelFromUploadedImage } from '../lib/gemini'
+import TokenCounter from './TokenCounter'
 
 interface CreateModelProps {
   onBack?: () => void
@@ -74,10 +75,16 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack, onViewModels }) => {
       
       console.log('Generated prompt:', constructedPrompt)
       
+      // Check if user is authenticated
+      if (!user?.id) {
+        throw new Error('You must be logged in to create a model')
+      }
+      
       // Korišćenje Gemini API-ja za generisanje modela
       const imageUrl = await generateFashionModel({
         prompt: constructedPrompt,
-        aspectRatio: '9:16'
+        aspectRatio: '9:16',
+        userId: user.id
       })
       
       const aiModel = {
@@ -197,9 +204,12 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack, onViewModels }) => {
             <h1 className="dashboard-title">Create Model</h1>
             <p className="dashboard-user">Create your fashion model</p>
           </div>
-          <button onClick={onBack || (() => window.history.back())} className="btn-signout" style={{background: '#667eea'}}>
-            Back to Dashboard
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <TokenCounter />
+            <button onClick={onBack || (() => window.history.back())} className="btn-signout" style={{background: '#667eea'}}>
+              Back to Dashboard
+            </button>
+          </div>
         </div>
       </header>
 
@@ -362,7 +372,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ onBack, onViewModels }) => {
                 {loading && (
                   <div style={{textAlign: 'center'}}>
                     <div className="spinner" style={{margin: '0 auto'}}></div>
-                    <p style={{marginTop: '10px', color: '#718096'}}>Creating your AI model with Gemini 2.5 Flash...</p>
+                    <p style={{marginTop: '10px', color: '#718096'}}>Creating your AI model with Gemini 3 Pro Image Preview...</p>
                   </div>
                 )}
 
