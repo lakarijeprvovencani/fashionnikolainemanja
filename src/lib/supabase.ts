@@ -96,25 +96,59 @@ export const db = {
 // Storage helper functions
 export const storage = {
   // Upload image to Supabase storage
-  async uploadImage(bucket: string, path: string, file: Blob): Promise<{ url: string | null, error: any }> {
+  async uploadImage(bucket: string, path: string, file: Blob | File): Promise<{ url: string | null, error: any }> {
     try {
+      // Check if user is authenticated
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !session) {
+        console.error('No active session:', sessionError)
+        throw new Error('User not authenticated. Please log in.')
+      }
+      
+      console.log('Uploading to storage:', { bucket, path, fileSize: file.size, fileType: file.type })
+      
       const { data, error } = await supabase.storage
         .from(bucket)
         .upload(path, file, {
           cacheControl: '3600',
-          upsert: false
+          upsert: true // Allow overwriting if file exists
         })
       
-      if (error) throw error
+      if (error) {
+        console.error('Supabase storage upload error:', {
+          message: error.message,
+          statusCode: error.statusCode,
+          error: error
+        })
+        throw error
+      }
+      
+      if (!data) {
+        throw new Error('Upload returned no data')
+      }
+      
+      console.log('Upload successful, getting public URL...')
       
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from(bucket)
         .getPublicUrl(path)
       
+      if (!publicUrl) {
+        throw new Error('Failed to get public URL')
+      }
+      
+      console.log('Public URL generated:', publicUrl)
+      
       return { url: publicUrl, error: null }
-    } catch (error) {
-      console.error('Error uploading image:', error)
+    } catch (error: any) {
+      console.error('Error uploading image to storage:', {
+        bucket,
+        path,
+        error: error?.message || error,
+        errorDetails: error,
+        statusCode: error?.statusCode
+      })
       return { url: null, error }
     }
   },
@@ -125,6 +159,130 @@ export const storage = {
       .from(bucket)
       .remove([path])
     return { error }
+  },
+
+  // Test storage connection and permissions
+  async testStorage(bucket: string) {
+    try {
+      // Check if user is authenticated
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !session) {
+        return { 
+          success: false, 
+          error: 'No active session', 
+          details: sessionError 
+        }
+      }
+
+      // Try to list files in bucket (this tests read permissions)
+      const { data: listData, error: listError } = await supabase.storage
+        .from(bucket)
+        .list('', { limit: 1 })
+
+      if (listError) {
+        return { 
+          success: false, 
+          error: 'Cannot access bucket', 
+          details: listError,
+          message: listError.message 
+        }
+      }
+
+      // Try to upload a small test file
+      const testBlob = new Blob(['test'], { type: 'text/plain' })
+      const testPath = `test-${Date.now()}.txt`
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(testPath, testBlob, { upsert: true })
+
+      if (uploadError) {
+        return { 
+          success: false, 
+          error: 'Cannot upload to bucket', 
+          details: uploadError,
+          message: uploadError.message,
+          statusCode: uploadError.statusCode
+        }
+      }
+
+      // Clean up test file
+      await supabase.storage.from(bucket).remove([testPath])
+
+      return { 
+        success: true, 
+        message: 'Storage is working correctly',
+        bucket,
+        userId: session.user.id
+      }
+    } catch (error: any) {
+      return { 
+        success: false, 
+        error: 'Storage test failed', 
+        details: error,
+        message: error?.message 
+      }
+    }
+  },
+
+  // Check bucket configuration and policies
+  async checkBucketConfig(bucket: string) {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !session) {
+        return { 
+          success: false, 
+          error: 'No active session' 
+        }
+      }
+
+      // Check if bucket exists and is accessible
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
+      
+      const bucketExists = buckets?.some(b => b.name === bucket)
+      
+      if (!bucketExists) {
+        return {
+          success: false,
+          error: `Bucket "${bucket}" does not exist`,
+          availableBuckets: buckets?.map(b => b.name) || []
+        }
+      }
+
+      // Try to get bucket info
+      const { data: files, error: listError } = await supabase.storage
+        .from(bucket)
+        .list('', { limit: 1 })
+
+      const bucketInfo = buckets?.find(b => b.name === bucket)
+
+      return {
+        success: true,
+        bucket: {
+          name: bucket,
+          id: bucketInfo?.id,
+          public: bucketInfo?.public || false,
+          createdAt: bucketInfo?.created_at,
+          updatedAt: bucketInfo?.updated_at,
+          fileSizeLimit: bucketInfo?.file_size_limit,
+          allowedMimeTypes: bucketInfo?.allowed_mime_types
+        },
+        canList: !listError,
+        listError: listError?.message,
+        userId: session.user.id,
+        sqlQueries: {
+          checkBucket: `SELECT * FROM storage.buckets WHERE name = '${bucket}';`,
+          checkPolicies: `SELECT * FROM storage.objects WHERE bucket_id = '${bucket}';`,
+          checkRLS: `SELECT * FROM pg_policies WHERE tablename = 'objects' AND schemaname = 'storage';`
+        }
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: 'Failed to check bucket config',
+        details: error?.message
+      }
+    }
   }
 }
 

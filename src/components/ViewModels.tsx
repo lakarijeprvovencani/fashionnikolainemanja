@@ -77,9 +77,12 @@ const ViewModels: React.FC<ViewModelsProps> = ({ onBack, onSelectModel, onNaviga
   }
 
   const handleSelectModel = (model: FashionModel) => {
-    setSelectedModel(model)
+    // Directly navigate to dress-model, don't show detail view
     if (onSelectModel) {
       onSelectModel(model)
+    } else if (onNavigate) {
+      // Fallback: if no onSelectModel callback, use onNavigate
+      onNavigate('dress-model')
     }
   }
 
@@ -93,108 +96,7 @@ const ViewModels: React.FC<ViewModelsProps> = ({ onBack, onSelectModel, onNaviga
     )
   }
 
-  // If selected model detail view is needed (for deletion or confirmation)
-  if (selectedModel) {
-    return (
-      <div className="dashboard" style={{ background: '#ffffff', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
-        <header className="dashboard-header" style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f0', padding: '20px 40px', height: '80px' }}>
-          <div className="dashboard-header-content" style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h1 className="dashboard-title" style={{ color: '#000', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '-0.5px', margin: 0 }}>{selectedModel.model_name}</h1>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <button 
-                onClick={() => setSelectedModel(null)} 
-                className="btn-signout" 
-                style={{ background: 'transparent', color: '#000', border: '1px solid #e0e0e0', padding: '8px 16px', borderRadius: '0px', fontSize: '13px', cursor: 'pointer' }}
-              >
-                ← Back to List
-              </button>
-              <button 
-                onClick={() => {
-                  if (onCreateModel) {
-                    onCreateModel()
-                  } else if (onNavigate) {
-                    onNavigate('create-model')
-                  }
-                }}
-                style={{ 
-                  background: '#000', 
-                  color: '#fff', 
-                  border: 'none', 
-                  padding: '8px 20px', 
-                  borderRadius: '0px', 
-                  fontSize: '13px', 
-                  fontWeight: '600',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#333'
-                  e.currentTarget.style.transform = 'translateY(-1px)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#000'
-                  e.currentTarget.style.transform = 'translateY(0)'
-                }}
-              >
-                + Create Model
-              </button>
-              {onNavigate && <UserMenu onNavigate={onNavigate} />}
-            </div>
-          </div>
-        </header>
-
-        <main className="dashboard-content" style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center' }}>
-            <img 
-              src={selectedModel.model_image_url} 
-              alt={selectedModel.model_name}
-              style={{ maxHeight: '600px', maxWidth: '100%', objectFit: 'contain', boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}
-            />
-            <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'center', gap: '20px' }}>
-              <button
-                onClick={() => {
-                  if (onSelectModel) onSelectModel(selectedModel)
-                }}
-                style={{
-                  padding: '16px 40px',
-                  background: '#000',
-                  color: '#fff',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  cursor: 'pointer'
-                }}
-              >
-                Use This Model
-              </button>
-              <button
-                onClick={() => deleteModel(selectedModel.id)}
-                style={{
-                  padding: '16px 40px',
-                  background: '#fff',
-                  color: '#c53030',
-                  border: '1px solid #e0e0e0',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  cursor: 'pointer'
-                }}
-              >
-                Delete Model
-              </button>
-            </div>
-          </div>
-        </main>
-      </div>
-    )
-  }
+  // Removed detail view - models go directly to dress-model when clicked
 
   // Grid View - Redesigned
   return (

@@ -2,5 +2,8 @@
 .env.local
 .env*.local
 node_modules
+node_modules/.vite
+node_modules/.package-lock.json
 dist
 *.log
+.DS_Store

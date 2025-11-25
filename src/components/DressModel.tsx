@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase, storage, dressedModels } from '../lib/supabase'
-import { generateDressedModel } from '../lib/gemini'
+import { generateDressedModel, processClothingImage } from '../lib/gemini'
 import UserMenu from './UserMenu'
 
 interface FashionModel {
@@ -40,6 +40,7 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel, onNav
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [processingClothing, setProcessingClothing] = useState<number | null>(null)
 
   // Save to localStorage whenever generatedImage changes
   useEffect(() => {
@@ -49,7 +50,7 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel, onNav
     }
   }, [generatedImage, scenePrompt])
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     
     const remainingSlots = 5 - clothingImages.length
@@ -59,10 +60,65 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel, onNav
       alert(`You can only upload ${remainingSlots} more image(s). Maximum is 5 images total.`)
     }
     
-    setClothingImages([...clothingImages, ...filesToAdd])
+    if (!user?.id) {
+      setError('You must be logged in to upload clothing images')
+      return
+    }
+
+    // Process each uploaded image
+    const processedImages: File[] = []
+    const processedPreviews: string[] = []
     
-    const newPreviewUrls = filesToAdd.map(file => URL.createObjectURL(file))
-    setPreviewUrls([...previewUrls, ...newPreviewUrls])
+    for (let i = 0; i < filesToAdd.length; i++) {
+      const file = filesToAdd[i]
+      const currentIndex = clothingImages.length + i
+      setProcessingClothing(currentIndex)
+      
+      try {
+        // Process the image to extract clothing only
+        const processedImageDataUrls = await processClothingImage({
+          imageFile: file,
+          userId: user.id
+        })
+        
+        // Convert each processed image back to File
+        // Each dataUrl represents a separate clothing item
+        for (let j = 0; j < processedImageDataUrls.length; j++) {
+          const dataUrl = processedImageDataUrls[j]
+          const response = await fetch(dataUrl)
+          const blob = await response.blob()
+          const processedFile = new File([blob], `clothing_${Date.now()}_${j}.png`, { type: 'image/png' })
+          processedImages.push(processedFile)
+          processedPreviews.push(dataUrl) // Use data URL for preview
+        }
+      } catch (err: any) {
+        console.error('Error processing clothing image:', err)
+        // If processing fails, use original image
+        processedImages.push(file)
+        processedPreviews.push(URL.createObjectURL(file))
+      }
+      
+      setProcessingClothing(null)
+    }
+    
+    // Check if we exceed the limit after processing
+    const totalAfterProcessing = clothingImages.length + processedImages.length
+    if (totalAfterProcessing > 5) {
+      const finalImages = processedImages.slice(0, 5 - clothingImages.length)
+      const finalPreviews = processedPreviews.slice(0, 5 - clothingImages.length)
+      setClothingImages([...clothingImages, ...finalImages])
+      setPreviewUrls([...previewUrls, ...finalPreviews])
+      alert(`Extracted ${processedImages.length} clothing item(s), added ${finalImages.length} to your selection. Maximum is 5 images total.`)
+    } else {
+      setClothingImages([...clothingImages, ...processedImages])
+      setPreviewUrls([...previewUrls, ...processedPreviews])
+      if (processedImages.length > 1) {
+        // Show success message if multiple items were extracted
+        setTimeout(() => {
+          alert(`✅ Successfully extracted ${processedImages.length} separate clothing items! Each item is now available for selection.`)
+        }, 100)
+      }
+    }
   }
 
   const removeImage = (index: number) => {
@@ -155,6 +211,65 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel, onNav
     }
   }
 
+  // If no model selected, redirect to view-models or show message
+  useEffect(() => {
+    if (!selectedModel && onViewModels) {
+      // Small delay to allow component to mount first
+      const timer = setTimeout(() => {
+        onViewModels()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [selectedModel, onViewModels])
+
+  if (!selectedModel) {
+    return (
+      <div className="dashboard" style={{ background: '#ffffff', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
+        <header className="dashboard-header" style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f0', padding: '20px 40px', height: '80px' }}>
+          <div className="dashboard-header-content" style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h1 className="dashboard-title" style={{ color: '#000', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '-0.5px', margin: 0 }}>Dress Studio</h1>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <button onClick={onBack} className="btn-signout" style={{ background: 'transparent', color: '#000', border: '1px solid #e0e0e0', padding: '8px 16px', borderRadius: '0px', fontSize: '13px', cursor: 'pointer' }}>
+                ← Back
+              </button>
+              {onNavigate && <UserMenu onNavigate={onNavigate} />}
+            </div>
+          </div>
+        </header>
+        <main className="dashboard-content" style={{ padding: '40px', maxWidth: '1600px', margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ padding: '100px 0' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: '300', color: '#000', marginBottom: '20px' }}>No Model Selected</h2>
+            <p style={{ color: '#666', marginBottom: '30px' }}>Please select a model to dress.</p>
+            <button
+              onClick={() => {
+                if (onViewModels) {
+                  onViewModels()
+                } else if (onNavigate) {
+                  onNavigate('view-models')
+                }
+              }}
+              style={{
+                padding: '16px 40px',
+                background: '#000',
+                color: '#fff',
+                border: 'none',
+                fontSize: '13px',
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                cursor: 'pointer'
+              }}
+            >
+              Select Model
+            </button>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="dashboard" style={{ background: '#ffffff', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
       <header className="dashboard-header" style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f0', padding: '20px 40px', height: '80px' }}>
@@ -225,22 +340,103 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel, onNav
               
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
                 {previewUrls.map((url, index) => (
-                  <div key={index} style={{ position: 'relative', aspectRatio: '1', background: '#f7f7f7', borderRadius: '6px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-                    <img src={url} alt="Clothing" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <button 
-                      onClick={() => removeImage(index)}
-                      style={{
-                        position: 'absolute',
-                        top: '6px', right: '6px',
-                        background: 'rgba(0,0,0,0.7)',
-                        color: '#fff', border: 'none', borderRadius: '50%',
-                        width: '24px', height: '24px', fontSize: '12px',
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.9)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.7)'}
-                    >✕</button>
+                  <div 
+                    key={index} 
+                    style={{ 
+                      position: 'relative', 
+                      aspectRatio: '1', 
+                      background: 'linear-gradient(135deg, #f8f8f8 0%, #ffffff 100%)',
+                      borderRadius: '10px', 
+                      overflow: 'hidden', 
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      border: '1px solid #e8e8e8',
+                      transition: 'all 0.3s ease',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
+                    }}
+                  >
+                    {processingClothing === index ? (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #f0f0f0 0%, #fafafa 100%)' }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div className="spinner" style={{ borderTopColor: '#000', borderLeftColor: '#000', margin: '0 auto 10px', width: '28px', height: '28px' }}></div>
+                          <p style={{ fontSize: '11px', color: '#666', fontWeight: '500' }}>Processing...</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Checkered background pattern for transparent images */}
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          backgroundImage: `
+                            linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+                            linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+                            linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+                            linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)
+                          `,
+                          backgroundSize: '12px 12px',
+                          backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0px',
+                          opacity: 0.3,
+                          zIndex: 0
+                        }} />
+                        <img 
+                          src={url} 
+                          alt="Clothing" 
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'contain',
+                            position: 'relative',
+                            zIndex: 1,
+                            padding: '8px'
+                          }} 
+                        />
+                        <button 
+                          onClick={() => removeImage(index)}
+                          style={{
+                            position: 'absolute',
+                            top: '8px', 
+                            right: '8px',
+                            background: 'rgba(255,255,255,0.95)',
+                            backdropFilter: 'blur(4px)',
+                            color: '#000', 
+                            border: '1px solid rgba(0,0,0,0.1)', 
+                            borderRadius: '50%',
+                            width: '28px', 
+                            height: '28px', 
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            cursor: 'pointer', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            transition: 'all 0.2s',
+                            zIndex: 2,
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#fff'
+                            e.currentTarget.style.borderColor = '#000'
+                            e.currentTarget.style.transform = 'scale(1.1)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.95)'
+                            e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)'
+                            e.currentTarget.style.transform = 'scale(1)'
+                          }}
+                        >×</button>
+                      </>
+                    )}
                   </div>
                 ))}
                 {clothingImages.length < 5 && (
@@ -249,26 +445,43 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel, onNav
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    cursor: 'pointer',
+                    cursor: processingClothing !== null ? 'wait' : 'pointer',
                     aspectRatio: '1',
                     borderRadius: '6px',
                     transition: 'all 0.2s',
-                    background: '#fcfcfc'
+                    background: '#fcfcfc',
+                    opacity: processingClothing !== null ? 0.5 : 1
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#000'
-                    e.currentTarget.style.background = '#f9f9f9'
+                    if (processingClothing === null) {
+                      e.currentTarget.style.borderColor = '#000'
+                      e.currentTarget.style.background = '#f9f9f9'
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#d0d0d0'
-                    e.currentTarget.style.background = '#fcfcfc'
+                    if (processingClothing === null) {
+                      e.currentTarget.style.borderColor = '#d0d0d0'
+                      e.currentTarget.style.background = '#fcfcfc'
+                    }
                   }}
                   >
                     <span style={{ fontSize: '32px', color: '#999', transition: 'color 0.2s' }}>+</span>
-                    <input type="file" accept="image/*" multiple onChange={handleImageUpload} style={{ display: 'none' }} />
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      multiple 
+                      onChange={handleImageUpload} 
+                      disabled={processingClothing !== null}
+                      style={{ display: 'none' }} 
+                    />
                   </label>
                 )}
               </div>
+              {processingClothing !== null && (
+                <p style={{ fontSize: '12px', color: '#666', marginTop: '8px', fontStyle: 'italic' }}>
+                  ⚙️ Processing clothing image... Extracting clothing items...
+                </p>
+              )}
               <p style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>Upload up to 5 clothing items</p>
             </div>
 

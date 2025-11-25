@@ -511,6 +511,155 @@ Return the response in this exact JSON format:
   }
 }
 
+interface ProcessClothingImageOptions {
+  imageFile: File
+  userId: string
+}
+
+/**
+ * Processes uploaded clothing image:
+ * - If it's a person wearing clothes, extracts only the clothing (without face/head)
+ * - If it's clothing on hanger, keeps it as is
+ * - Splits complete outfits into individual pieces (shirt, pants, etc.)
+ */
+export const processClothingImage = async (options: ProcessClothingImageOptions): Promise<string[]> => {
+  try {
+    const { imageFile, userId } = options
+    
+    // Convert image to base64
+    const base64Image = await fileToBase64(imageFile)
+    const base64Data = base64Image.split(',')[1]
+    const imagePart = { inlineData: { data: base64Data, mimeType: imageFile.type } }
+    
+    // First, analyze what's in the image
+    const analysisPrompt = `Analyze this image and determine:
+1. Is this clothing on a hanger/mannequin OR a person wearing clothes?
+2. If it's a person, identify all clothing items visible (shirt, pants, jacket, etc.)
+3. Count how many separate clothing pieces are visible
+
+Respond in JSON format:
+{
+  "type": "person" | "hanger" | "flat_lay",
+  "clothing_items": ["shirt", "pants", ...],
+  "count": number
+}`
+
+    const analysisResponse = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { parts: [imagePart, { text: analysisPrompt }] },
+    })
+    
+    const analysisText = analysisResponse.candidates?.[0]?.content?.parts.find((part: any) => part.text)?.text || ''
+    
+    let analysis: { type: string; clothing_items: string[]; count: number }
+    try {
+      const jsonMatch = analysisText.match(/```json\s*([\s\S]*?)\s*```/) || analysisText.match(/```\s*([\s\S]*?)\s*```/)
+      const jsonText = jsonMatch ? jsonMatch[1] : analysisText
+      analysis = JSON.parse(jsonText.trim())
+    } catch {
+      // Fallback: assume it's a person with multiple items
+      analysis = { type: 'person', clothing_items: ['clothing'], count: 1 }
+    }
+
+    // If it's clothing on hanger or flat lay, return as single image
+    if (analysis.type === 'hanger' || analysis.type === 'flat_lay') {
+      return [base64Image]
+    }
+
+    // If it's a person, extract clothing without face/head and split into pieces
+    // Strategy: Generate each clothing item separately with individual API calls
+    const images: string[] = []
+    
+    console.log(`🎯 Extracting ${analysis.clothing_items.length} clothing items separately...`)
+    
+    // Generate each clothing item in a separate API call
+    for (let i = 0; i < Math.min(analysis.clothing_items.length, 5); i++) {
+      const item = analysis.clothing_items[i]
+      console.log(`  Processing item ${i + 1}/${Math.min(analysis.clothing_items.length, 5)}: ${item}`)
+      
+      const extractionPrompt = `Extract ONLY the ${item} from this image. 
+
+CRITICAL REQUIREMENTS:
+1. Show ONLY the ${item} - nothing else
+2. Remove ALL other clothing items, body parts, face, head, and skin
+3. The ${item} should be isolated on a transparent or white background
+4. Do NOT include any other clothing items in this image
+5. Do NOT include any human body parts
+
+Generate ONE image showing ONLY the ${item}.`
+
+      try {
+        const extractionResponse = await ai.models.generateContent({
+          model: 'gemini-3-pro-image-preview',
+          contents: { parts: [imagePart, { text: extractionPrompt }] },
+          config: {
+            responseModalities: [Modality.IMAGE],
+            imageConfig: {
+              numberOfImages: 1
+            }
+          }
+        })
+
+        // Extract the image from this response
+        const candidate = extractionResponse.candidates?.[0]
+        if (candidate) {
+          const parts = candidate.content?.parts || []
+          for (const part of parts) {
+            if (part.inlineData) {
+              images.push(`data:image/png;base64,${part.inlineData.data}`)
+              console.log(`  ✅ Extracted ${item} (image ${images.length})`)
+              break // Only take first image from this response
+            }
+          }
+        }
+        
+        // Small delay between requests to avoid rate limiting
+        if (i < Math.min(analysis.clothing_items.length, 5) - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+      } catch (err) {
+        console.error(`  ⚠️ Error extracting ${item}:`, err)
+        // Continue with next item
+      }
+    }
+    
+    console.log(`📊 Total extracted images: ${images.length}`)
+
+    // If we got images, return them; otherwise return original
+    if (images.length > 0) {
+      return images
+    }
+
+    // Fallback: try simpler extraction (just remove person, keep clothing)
+    const simpleExtractionPrompt = `Extract only the clothing from this image. Remove the person's face, head, and body. Show only the clothing items on a neutral background.`
+    
+    const simpleResponse = await ai.models.generateContent({
+      model: 'gemini-3-pro-image-preview',
+      contents: { parts: [imagePart, { text: simpleExtractionPrompt }] },
+      config: {
+        responseModalities: [Modality.IMAGE],
+        imageConfig: {
+          numberOfImages: 1
+        }
+      }
+    })
+
+    const simpleImagePart = simpleResponse.candidates?.[0]?.content?.parts.find((part: any) => part.inlineData)
+    if (simpleImagePart?.inlineData) {
+      return [`data:image/png;base64,${simpleImagePart.inlineData.data}`]
+    }
+
+    // Last resort: return original
+    return [base64Image]
+    
+  } catch (error: any) {
+    console.error('Error processing clothing image:', error)
+    // Return original image if processing fails
+    const base64Image = await fileToBase64(options.imageFile)
+    return [base64Image]
+  }
+}
+
 interface EditImageOptions {
   imageUrl: string
   prompt: string
