@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { generateSocialMediaCaptions } from '../lib/gemini'
-import { storage } from '../lib/supabase'
-import UserMenu from './UserMenu'
+import { generateSocialMediaCaptions, expandTextWithAI } from '../lib/gemini'
+import { storage, userHistory } from '../lib/supabase'
+import PageHeader from './PageHeader'
 import JSZip from 'jszip'
 
 interface CreateCaptionsViewProps {
@@ -17,18 +17,47 @@ const CreateCaptionsView: React.FC<CreateCaptionsViewProps> = ({ imageUrl, scene
   const [captions, setCaptions] = useState({
     instagram: '',
     webshop: '',
-    facebook: ''
+    facebook: '',
+    email: '',
+    emailSubject: ''
   })
   const [loading, setLoading] = useState({
     instagram: false,
     webshop: false,
-    facebook: false
+    facebook: false,
+    email: false
   })
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<'instagram' | 'webshop' | 'facebook'>('instagram')
+  const [activeTab, setActiveTab] = useState<'instagram' | 'webshop' | 'facebook' | 'email'>('instagram')
   const [productPrice, setProductPrice] = useState<string>('')
   const [productName, setProductName] = useState<string>('')
   const [exporting, setExporting] = useState(false)
+  
+  // Instagram caption options
+  const [instagramOptions, setInstagramOptions] = useState({
+    tone: 'medium' as 'casual' | 'medium' | 'formal',
+    length: 'medium' as 'short' | 'medium' | 'long',
+    hashtags: true
+  })
+  
+  // Facebook caption options
+  const [facebookOptions, setFacebookOptions] = useState({
+    tone: 'casual' as 'casual' | 'medium' | 'formal',
+    length: 'medium' as 'short' | 'medium' | 'long'
+  })
+
+  // Email caption options
+  const [emailOptions, setEmailOptions] = useState({
+    tone: 'medium' as 'casual' | 'medium' | 'formal',
+    length: 'medium' as 'short' | 'medium' | 'long'
+  })
+  
+  // Text selection and AI expansion
+  const [selectedText, setSelectedText] = useState('')
+  const [selectionStart, setSelectionStart] = useState(0)
+  const [selectionEnd, setSelectionEnd] = useState(0)
+  const [expandingText, setExpandingText] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [currentImage, setCurrentImage] = useState<string | null>(() => {
     // Load from localStorage first, then fallback to prop
     const saved = localStorage.getItem('dressModel_generatedImage')
@@ -56,7 +85,7 @@ const CreateCaptionsView: React.FC<CreateCaptionsViewProps> = ({ imageUrl, scene
     }
   }, [imageUrl, scenePrompt])
 
-  const generateSpecificCaption = async (platform: 'instagram' | 'webshop' | 'facebook') => {
+  const generateSpecificCaption = async (platform: 'instagram' | 'webshop' | 'facebook' | 'email') => {
     const imageToUse = currentImage || imageUrl
     if (!imageToUse) return
 
@@ -66,10 +95,38 @@ const CreateCaptionsView: React.FC<CreateCaptionsViewProps> = ({ imageUrl, scene
     try {
       const generated = await generateSocialMediaCaptions({
         imageUrl: imageToUse,
-        sceneDescription: currentScenePrompt || scenePrompt
+        sceneDescription: currentScenePrompt || scenePrompt,
+        instagramOptions: platform === 'instagram' ? instagramOptions : undefined,
+        facebookOptions: platform === 'facebook' ? facebookOptions : undefined,
+        emailOptions: platform === 'email' ? emailOptions : undefined
       })
       
-      setCaptions({ ...captions, [platform]: generated[platform] })
+      setCaptions({ 
+        ...captions, 
+        [platform]: generated[platform],
+        emailSubject: platform === 'email' ? generated.emailSubject : captions.emailSubject
+      })
+      
+      // Save to activity history when captions are generated
+      if (user?.id && generated[platform]) {
+        await userHistory.saveActivity({
+          userId: user.id,
+          activityType: 'create_captions',
+          imageUrl: imageToUse || null,
+          captions: {
+            [platform]: generated[platform],
+            emailSubject: platform === 'email' ? generated.emailSubject : undefined
+          },
+          metadata: {
+            platform: platform,
+            instagramOptions: platform === 'instagram' ? instagramOptions : undefined,
+            facebookOptions: platform === 'facebook' ? facebookOptions : undefined,
+            emailOptions: platform === 'email' ? emailOptions : undefined,
+            productName: productName || undefined,
+            productPrice: productPrice || undefined
+          }
+        }).catch(err => console.error('Error saving activity history:', err))
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to generate caption.')
     } finally {
@@ -77,133 +134,358 @@ const CreateCaptionsView: React.FC<CreateCaptionsViewProps> = ({ imageUrl, scene
     }
   }
 
-  const copyCaption = (platform: 'instagram' | 'webshop' | 'facebook') => {
-    if (captions[platform]) {
+  const copyCaption = (platform: 'instagram' | 'webshop' | 'facebook' | 'email') => {
+    if (platform === 'email' && captions.email) {
+      const emailContent = `Subject: ${captions.emailSubject}\n\n${captions.email}`
+      navigator.clipboard.writeText(emailContent)
+    } else if (captions[platform]) {
       navigator.clipboard.writeText(captions[platform])
-      // Could add a toast notification here
     }
   }
 
   const tabs = [
     { id: 'instagram' as const, icon: '📷', label: 'Instagram', placeholder: 'Click "Generate" to create an engaging Instagram caption with hashtags and emojis...', charLimit: 2200 },
     { id: 'webshop' as const, icon: '🛍️', label: 'Web Shop', placeholder: 'Click "Generate" to create a professional product description...', charLimit: undefined },
-    { id: 'facebook' as const, icon: '📘', label: 'Facebook', placeholder: 'Click "Generate" to create a conversational Facebook post...', charLimit: undefined }
+    { id: 'facebook' as const, icon: '📘', label: 'Facebook', placeholder: 'Click "Generate" to create a conversational Facebook post...', charLimit: undefined },
+    { id: 'email' as const, icon: '📧', label: 'Email', placeholder: 'Click "Generate" to create a compelling email campaign...', charLimit: undefined }
   ]
 
   const activeTabData = tabs.find(t => t.id === activeTab)!
 
   return (
-    <div className="dashboard" style={{ background: '#ffffff', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
-      <header className="dashboard-header" style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f0', padding: '20px 40px', height: '80px' }}>
-        <div className="dashboard-header-content" style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 className="dashboard-title" style={{ color: '#000', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '-0.5px', margin: 0 }}>
-              Create Captions
-            </h1>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <button onClick={onBack} style={{ background: 'transparent', color: '#000', border: '1px solid #e0e0e0', padding: '8px 16px', borderRadius: '0px', fontSize: '13px', cursor: 'pointer' }}>
-              ← Back
-            </button>
-            {onNavigate && <UserMenu onNavigate={onNavigate} />}
-          </div>
-        </div>
-      </header>
+    <div className="dashboard" style={{ background: '#fafafa', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
+      <PageHeader 
+        title="Create Captions" 
+        onBack={onBack}
+        onNavigate={onNavigate}
+      />
 
       <main className="dashboard-content" style={{ padding: '40px', maxWidth: '1600px', margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '450px 1fr', gap: '60px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '480px 1fr', gap: '60px' }}>
           
           {/* LEFT: Captions Controls */}
           <div>
-            {/* Tabs */}
+            {/* Modern Tabs */}
             <div style={{ 
-              display: 'flex', 
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
               gap: '8px', 
               marginBottom: '32px',
-              borderBottom: '1px solid #f0f0f0',
-              paddingBottom: '16px'
+              background: '#f5f5f5',
+              padding: '6px',
+              borderRadius: '12px'
             }}>
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   style={{
-                    flex: 1,
-                    padding: '12px 16px',
-                    background: activeTab === tab.id ? '#000' : 'transparent',
-                    color: activeTab === tab.id ? '#fff' : '#666',
-                    border: activeTab === tab.id ? 'none' : '1px solid #e0e0e0',
-                    fontSize: '20px',
+                    padding: '14px 12px',
+                    background: activeTab === tab.id ? '#ffffff' : 'transparent',
+                    color: activeTab === tab.id ? '#1f2937' : '#6b7280',
+                    border: 'none',
+                    fontSize: '18px',
                     cursor: 'pointer',
                     borderRadius: '8px',
-                    transition: 'all 0.2s',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    gap: '4px',
+                    boxShadow: activeTab === tab.id ? '0 2px 8px rgba(0, 0, 0, 0.1)' : 'none',
+                    fontWeight: activeTab === tab.id ? '600' : '400'
                   }}
                   onMouseEnter={(e) => {
                     if (activeTab !== tab.id) {
-                      e.currentTarget.style.background = '#f9f9f9'
-                      e.currentTarget.style.borderColor = '#000'
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.5)'
+                      e.currentTarget.style.color = '#374151'
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (activeTab !== tab.id) {
                       e.currentTarget.style.background = 'transparent'
-                      e.currentTarget.style.borderColor = '#e0e0e0'
+                      e.currentTarget.style.color = '#6b7280'
                     }
                   }}
                 >
-                  {tab.icon}
+                  <span>{tab.icon}</span>
+                  <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{tab.label}</span>
                 </button>
               ))}
             </div>
 
             {/* Active Tab Content */}
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#000', margin: 0 }}>
-                  {activeTabData.label}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1f2937', margin: 0 }}>
+                  {activeTabData.label} Content
                 </h3>
                 <button
                   onClick={() => generateSpecificCaption(activeTab)}
                   disabled={loading[activeTab]}
                   style={{
-                    padding: '10px 20px',
-                    background: loading[activeTab] ? '#e0e0e0' : '#000',
-                    color: loading[activeTab] ? '#999' : '#fff',
+                    padding: '12px 24px',
+                    background: loading[activeTab] ? '#e5e7eb' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#ffffff',
                     border: 'none',
-                    fontSize: '12px',
-                    fontWeight: '600',
+                    fontSize: '13px',
+                    fontWeight: '700',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px',
                     cursor: loading[activeTab] ? 'not-allowed' : 'pointer',
-                    borderRadius: '6px',
-                    transition: 'all 0.2s',
+                    borderRadius: '10px',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px'
+                    gap: '8px',
+                    boxShadow: loading[activeTab] ? 'none' : '0 4px 14px rgba(102, 126, 234, 0.4)'
                   }}
                   onMouseEnter={(e) => {
                     if (!loading[activeTab]) {
-                      e.currentTarget.style.background = '#333'
+                      e.currentTarget.style.transform = 'translateY(-1px)'
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.5)'
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!loading[activeTab]) {
-                      e.currentTarget.style.background = '#000'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 14px rgba(102, 126, 234, 0.4)'
                     }
                   }}
                 >
-                  {loading[activeTab] ? '...' : '✨ Generate'}
+                  {loading[activeTab] ? (
+                    <>
+                      <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                      </svg>
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                      </svg>
+                      Generate
+                    </>
+                  )}
                 </button>
+              </div>
+
+              {/* Caption Options - Only for Instagram, Facebook, Email */}
+              {(activeTab === 'instagram' || activeTab === 'facebook' || activeTab === 'email') && (
+                <div style={{
+                  background: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  marginBottom: '20px'
+                }}>
+                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                    Customize Generation
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: activeTab === 'instagram' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '12px' }}>
+                    {/* Tone */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                        Tone of Voice
+                      </label>
+                      <select
+                        value={activeTab === 'instagram' ? instagramOptions.tone : activeTab === 'facebook' ? facebookOptions.tone : emailOptions.tone}
+                        onChange={(e) => {
+                          const value = e.target.value as 'casual' | 'medium' | 'formal'
+                          if (activeTab === 'instagram') {
+                            setInstagramOptions({ ...instagramOptions, tone: value })
+                          } else if (activeTab === 'facebook') {
+                            setFacebookOptions({ ...facebookOptions, tone: value })
+                          } else {
+                            setEmailOptions({ ...emailOptions, tone: value })
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '12px 14px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          background: '#ffffff',
+                          color: '#1f2937',
+                          outline: 'none',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          height: '42px',
+                          boxSizing: 'border-box',
+                          appearance: 'none',
+                          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                          backgroundPosition: 'right 10px center',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundSize: '16px',
+                          paddingRight: '36px'
+                        }}
+                        onFocus={(e) => e.currentTarget.style.borderColor = '#667eea'}
+                        onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
+                      >
+                        <option value="casual">Casual</option>
+                        <option value="medium">Balanced</option>
+                        <option value="formal">Formal</option>
+                      </select>
+                    </div>
+                    
+                    {/* Length */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                        {activeTab === 'email' ? 'Email Length' : 'Post Length'}
+                      </label>
+                      <select
+                        value={activeTab === 'instagram' ? instagramOptions.length : activeTab === 'facebook' ? facebookOptions.length : emailOptions.length}
+                        onChange={(e) => {
+                          const value = e.target.value as 'short' | 'medium' | 'long'
+                          if (activeTab === 'instagram') {
+                            setInstagramOptions({ ...instagramOptions, length: value })
+                          } else if (activeTab === 'facebook') {
+                            setFacebookOptions({ ...facebookOptions, length: value })
+                          } else {
+                            setEmailOptions({ ...emailOptions, length: value })
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '12px 14px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          background: '#ffffff',
+                          color: '#1f2937',
+                          outline: 'none',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          height: '42px',
+                          boxSizing: 'border-box',
+                          appearance: 'none',
+                          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                          backgroundPosition: 'right 10px center',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundSize: '16px',
+                          paddingRight: '36px'
+                        }}
+                        onFocus={(e) => e.currentTarget.style.borderColor = '#667eea'}
+                        onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
+                      >
+                        <option value="short">Short</option>
+                        <option value="medium">Medium</option>
+                        <option value="long">Long</option>
+                      </select>
+                    </div>
+                    
+                    {/* Hashtags - Only for Instagram */}
+                    {activeTab === 'instagram' && (
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                          Hashtags
+                        </label>
+                        <div style={{
+                          width: '100%',
+                          padding: '0 14px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          background: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          height: '42px',
+                          boxSizing: 'border-box'
+                        }}
+                        onClick={() => setInstagramOptions({ ...instagramOptions, hashtags: !instagramOptions.hashtags })}
+                        onMouseEnter={(e) => e.currentTarget.style.borderColor = '#667eea'}
+                        onMouseLeave={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={instagramOptions.hashtags}
+                            onChange={() => setInstagramOptions({ ...instagramOptions, hashtags: !instagramOptions.hashtags })}
+                            style={{ cursor: 'pointer', flexShrink: 0, width: '18px', height: '18px' }}
+                          />
+                          <span style={{ fontSize: '13px', color: '#1f2937', whiteSpace: 'nowrap' }}>Hashtags</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Email Subject Input - Only for Email tab */}
+              {activeTab === 'email' && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#374151', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Email Subject Line
+                  </label>
+                  <input
+                    type="text"
+                    value={captions.emailSubject}
+                    onChange={(e) => setCaptions({ ...captions, emailSubject: e.target.value })}
+                    placeholder="Email subject will be generated..."
+                    style={{
+                      width: '100%',
+                      padding: '14px 16px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      background: '#ffffff',
+                      color: '#1f2937',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      transition: 'all 0.2s',
+                      fontWeight: captions.emailSubject ? '600' : '400'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#667eea'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#d1d5db'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Instructions */}
+              <div style={{
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '10px',
+                padding: '14px 16px',
+                marginBottom: '16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'start', gap: '10px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" style={{ flexShrink: 0, marginTop: '2px' }}>
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                  <div style={{ fontSize: '13px', color: '#1e40af', lineHeight: '1.6' }}>
+                    <strong>Tip:</strong> You can write your own caption or click "Generate" to create one automatically. 
+                    {activeTab !== 'webshop' && ' You can also select any text you\'ve written and use "Ask AI" to expand or improve it.'}
+                  </div>
+                </div>
               </div>
 
               {/* Product Info Fields - Only for Web Shop */}
               {activeTab === 'webshop' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr 1fr', 
+                  gap: '14px', 
+                  marginBottom: '20px',
+                  background: '#f9fafb',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '1px solid #e5e7eb'
+                }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#374151', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       Product Name
                     </label>
                     <input
@@ -213,20 +495,28 @@ const CreateCaptionsView: React.FC<CreateCaptionsViewProps> = ({ imageUrl, scene
                       placeholder="e.g., Fashion T-Shirt"
                       style={{
                         width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '6px',
+                        padding: '12px 14px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
                         fontSize: '14px',
                         outline: 'none',
                         fontFamily: 'inherit',
-                        transition: 'border-color 0.2s'
+                        transition: 'all 0.2s',
+                        background: '#ffffff',
+                        color: '#1f2937'
                       }}
-                      onFocus={(e) => e.currentTarget.style.borderColor = '#000'}
-                      onBlur={(e) => e.currentTarget.style.borderColor = '#e0e0e0'}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#667eea'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#d1d5db'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#666', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#374151', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       Price ($)
                     </label>
                     <input
@@ -238,74 +528,202 @@ const CreateCaptionsView: React.FC<CreateCaptionsViewProps> = ({ imageUrl, scene
                       min="0"
                       style={{
                         width: '100%',
-                        padding: '12px',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '6px',
+                        padding: '12px 14px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
                         fontSize: '14px',
                         outline: 'none',
                         fontFamily: 'inherit',
-                        transition: 'border-color 0.2s'
+                        transition: 'all 0.2s',
+                        background: '#ffffff',
+                        color: '#1f2937'
                       }}
-                      onFocus={(e) => e.currentTarget.style.borderColor = '#000'}
-                      onBlur={(e) => e.currentTarget.style.borderColor = '#e0e0e0'}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#667eea'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#d1d5db'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
                     />
                   </div>
                 </div>
               )}
 
               <textarea
+                ref={textareaRef}
                 value={captions[activeTab]}
                 onChange={(e) => setCaptions({ ...captions, [activeTab]: e.target.value })}
+                onSelect={(e) => {
+                  const textarea = e.target as HTMLTextAreaElement
+                  const start = textarea.selectionStart
+                  const end = textarea.selectionEnd
+                  const selected = textarea.value.substring(start, end)
+                  
+                  if (selected.trim().length > 0) {
+                    setSelectedText(selected)
+                    setSelectionStart(start)
+                    setSelectionEnd(end)
+                  } else {
+                    setSelectedText('')
+                  }
+                }}
                 placeholder={activeTabData.placeholder}
                 style={{
                   width: '100%',
-                  minHeight: '300px',
-                  padding: '18px',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '8px',
+                  minHeight: '320px',
+                  padding: '20px',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '12px',
                   fontSize: '14px',
-                  lineHeight: '1.6',
+                  lineHeight: '1.7',
                   resize: 'vertical',
                   outline: 'none',
                   fontFamily: 'inherit',
-                  transition: 'border-color 0.2s',
-                  background: '#fafafa'
+                  transition: 'all 0.2s',
+                  background: '#ffffff',
+                  color: '#1f2937'
                 }}
-                onFocus={(e) => e.currentTarget.style.borderColor = '#000'}
-                onBlur={(e) => e.currentTarget.style.borderColor = '#e0e0e0'}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#667eea'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
               />
               
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
-                <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>
-                  {captions[activeTab].length} characters
-                  {activeTabData.charLimit && ` (limit: ${activeTabData.charLimit.toLocaleString()})`}
+              {/* Ask AI Button - Shows when text is selected, positioned below textarea */}
+              {selectedText.trim().length > 0 && activeTab !== 'webshop' && (
+                <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={async () => {
+                      if (!selectedText.trim() || expandingText) return
+                      
+                      setExpandingText(true)
+                      try {
+                        const expanded = await expandTextWithAI({
+                          selectedText: selectedText,
+                          platform: activeTab,
+                          context: currentScenePrompt || scenePrompt,
+                          instagramOptions: activeTab === 'instagram' ? instagramOptions : undefined,
+                          facebookOptions: activeTab === 'facebook' ? facebookOptions : undefined,
+                          emailOptions: activeTab === 'email' ? emailOptions : undefined
+                        })
+                        
+                        // Insert expanded text after the selected text
+                        const currentText = captions[activeTab]
+                        const beforeSelection = currentText.substring(0, selectionStart)
+                        const afterSelection = currentText.substring(selectionEnd)
+                        const newText = beforeSelection + selectedText + ' ' + expanded + afterSelection
+                        
+                        setCaptions({ ...captions, [activeTab]: newText })
+                        setSelectedText('')
+                        
+                        // Reset selection
+                        if (textareaRef.current) {
+                          setTimeout(() => {
+                            textareaRef.current?.focus()
+                            const newCursorPos = selectionEnd + expanded.length + 1
+                            textareaRef.current?.setSelectionRange(newCursorPos, newCursorPos)
+                          }, 100)
+                        }
+                      } catch (err: any) {
+                        setError(err.message || 'Failed to expand text. Please try again.')
+                      } finally {
+                        setExpandingText(false)
+                      }
+                    }}
+                    disabled={expandingText}
+                    style={{
+                      padding: '10px 18px',
+                      background: expandingText ? '#e5e7eb' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: expandingText ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: expandingText ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.4)'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!expandingText) {
+                        e.currentTarget.style.transform = 'translateY(-1px)'
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!expandingText) {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+                      }
+                    }}
+                  >
+                    {expandingText ? (
+                      <>
+                        <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                        </svg>
+                        Expanding...
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        </svg>
+                        Ask AI to Expand
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px' }}>
+                <p style={{ fontSize: '12px', color: '#6b7280', margin: 0, fontWeight: '500' }}>
+                  {captions[activeTab].length.toLocaleString()} characters
+                  {activeTabData.charLimit && ` / ${activeTabData.charLimit.toLocaleString()} limit`}
                 </p>
                 {captions[activeTab] && (
                   <button
                     onClick={() => copyCaption(activeTab)}
                     style={{
-                      padding: '8px 16px',
-                      background: 'transparent',
-                      border: '1px solid #e0e0e0',
+                      padding: '10px 18px',
+                      background: '#ffffff',
+                      border: '2px solid #e5e7eb',
                       fontSize: '12px',
                       fontWeight: '600',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px',
                       cursor: 'pointer',
-                      borderRadius: '6px',
-                      color: '#666',
-                      transition: 'all 0.2s'
+                      borderRadius: '8px',
+                      color: '#374151',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#000'
-                      e.currentTarget.style.color = '#000'
+                      e.currentTarget.style.borderColor = '#667eea'
+                      e.currentTarget.style.color = '#667eea'
+                      e.currentTarget.style.background = '#f3e8ff'
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#e0e0e0'
-                      e.currentTarget.style.color = '#666'
+                      e.currentTarget.style.borderColor = '#e5e7eb'
+                      e.currentTarget.style.color = '#374151'
+                      e.currentTarget.style.background = '#ffffff'
                     }}
                   >
-                    📋 Copy
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Copy
                   </button>
                 )}
               </div>
@@ -380,6 +798,28 @@ Generated: ${new Date().toLocaleString()}
 2. Upload product-image.png
 3. Copy and paste the caption from facebook-caption.txt
 4. Post!
+
+Enjoy! 🎉
+`
+                        zip.file('README.txt', readme)
+                      } else if (activeTab === 'email') {
+                        const emailContent = `Subject: ${captions.emailSubject}\n\n${captions.email}`
+                        zip.file('email-campaign.txt', emailContent)
+                        const readme = `# Email Campaign Export
+
+Generated: ${new Date().toLocaleString()}
+
+## Contents:
+- product-image.png - Product image (local backup copy)
+- email-campaign.txt - Email subject and body
+
+## Instructions:
+1. Open your email client or marketing platform.
+2. Create a new email.
+3. Set the subject line using the "Subject" from email-campaign.txt.
+4. Copy and paste the email body from email-campaign.txt.
+5. Upload product-image.png as an attachment or embed it in the email.
+6. Customize as needed and send!
 
 Enjoy! 🎉
 `
@@ -678,79 +1118,80 @@ Enjoy! 🎉
                   style={{
                     width: '100%',
                     marginTop: '16px',
-                    padding: '12px',
-                    background: exporting ? '#e0e0e0' : '#000',
-                    color: exporting ? '#999' : '#fff',
+                    padding: '16px',
+                    background: exporting ? '#e5e7eb' : 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
+                    color: '#ffffff',
                     border: 'none',
-                    fontSize: '12px',
-                    fontWeight: '600',
+                    fontSize: '13px',
+                    fontWeight: '700',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px',
                     cursor: exporting ? 'not-allowed' : 'pointer',
-                    borderRadius: '6px',
-                    transition: 'all 0.2s',
+                    borderRadius: '12px',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '8px'
+                    gap: '10px',
+                    boxShadow: exporting ? 'none' : '0 4px 14px rgba(31, 41, 55, 0.3)'
                   }}
                   onMouseEnter={(e) => {
                     if (!exporting) {
-                      e.currentTarget.style.background = '#333'
+                      e.currentTarget.style.transform = 'translateY(-1px)'
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(31, 41, 55, 0.4)'
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!exporting) {
-                      e.currentTarget.style.background = '#000'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 14px rgba(31, 41, 55, 0.3)'
                     }
                   }}
                 >
-                  {exporting ? '⏳ Creating Package...' : `📦 Export ${activeTabData.label} (ZIP)`}
+                  {exporting ? (
+                    <>
+                      <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                      </svg>
+                      Creating Package...
+                    </>
+                  ) : (
+                    <>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                      </svg>
+                      Export {activeTabData.label} (ZIP)
+                    </>
+                  )}
                 </button>
               )}
             </div>
 
             {error && (
-              <div style={{ padding: '12px', background: '#fff5f5', color: '#c53030', fontSize: '13px', border: '1px solid #feb2b2', borderRadius: '6px', marginTop: '24px' }}>
+              <div style={{ 
+                padding: '14px 16px', 
+                background: '#fef2f2', 
+                color: '#dc2626', 
+                fontSize: '14px', 
+                border: '2px solid #fecaca', 
+                borderRadius: '12px', 
+                marginTop: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                fontWeight: '500'
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
                 {error}
               </div>
             )}
 
-            {/* Copy All Button - Only show if at least one caption exists */}
-            {(captions.instagram || captions.webshop || captions.facebook) && (
-              <button
-                onClick={() => {
-                  const allCaptions = `INSTAGRAM:\n${captions.instagram}\n\nWEB SHOP:\n${captions.webshop}\n\nFACEBOOK:\n${captions.facebook}`
-                  navigator.clipboard.writeText(allCaptions)
-                  alert('All captions copied to clipboard!')
-                }}
-                style={{
-                  width: '100%',
-                  marginTop: '12px',
-                  padding: '12px',
-                  background: '#f9f9f9',
-                  color: '#000',
-                  border: '1px solid #e0e0e0',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  cursor: 'pointer',
-                  borderRadius: '8px',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#fff'
-                  e.currentTarget.style.borderColor = '#000'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#f9f9f9'
-                  e.currentTarget.style.borderColor = '#e0e0e0'
-                }}
-              >
-                📋 Copy All Captions
-              </button>
-            )}
           </div>
 
           {/* RIGHT: Platform Preview */}
@@ -761,39 +1202,42 @@ Enjoy! 🎉
           }}>
             {activeTab === 'instagram' && (
               <div style={{
-                background: '#fff',
-                borderRadius: '12px',
+                background: '#ffffff',
+                borderRadius: '16px',
                 border: '1px solid #dbdbdb',
-                maxWidth: '400px',
+                maxWidth: '420px',
                 margin: '0 auto',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+                overflow: 'hidden'
               }}>
                 {/* Instagram Header */}
                 <div style={{
-                  padding: '12px 16px',
+                  padding: '14px 16px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
-                  borderBottom: '1px solid #efefef'
+                  borderBottom: '1px solid #efefef',
+                  background: '#ffffff'
                 }}>
                   <div style={{
-                    width: '32px',
-                    height: '32px',
+                    width: '36px',
+                    height: '36px',
                     borderRadius: '50%',
                     background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#fff',
-                    fontWeight: '600',
-                    fontSize: '14px'
+                    fontWeight: '700',
+                    fontSize: '15px',
+                    boxShadow: '0 2px 8px rgba(220, 38, 67, 0.3)'
                   }}>
                     A
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '14px', fontWeight: '600', color: '#262626' }}>your_brand</div>
                   </div>
-                  <div style={{ fontSize: '20px', color: '#262626', cursor: 'pointer' }}>⋯</div>
+                  <div style={{ fontSize: '22px', color: '#262626', cursor: 'pointer', padding: '4px' }}>⋯</div>
                 </div>
 
                 {/* Instagram Image */}
@@ -813,22 +1257,31 @@ Enjoy! 🎉
                 )}
 
                 {/* Instagram Actions */}
-                <div style={{ padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
-                    <span style={{ fontSize: '24px', cursor: 'pointer' }}>🤍</span>
-                    <span style={{ fontSize: '24px', cursor: 'pointer' }}>💬</span>
-                    <span style={{ fontSize: '24px', cursor: 'pointer' }}>📤</span>
-                    <span style={{ fontSize: '24px', cursor: 'pointer', marginLeft: 'auto' }}>🔖</span>
+                <div style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', gap: '18px', marginBottom: '14px' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ cursor: 'pointer', color: '#262626' }}>
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    </svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ cursor: 'pointer', color: '#262626' }}>
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ cursor: 'pointer', color: '#262626' }}>
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ cursor: 'pointer', color: '#262626', marginLeft: 'auto' }}>
+                      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                    </svg>
                   </div>
                   
                   {/* Caption */}
                   {captions.instagram ? (
-                    <div style={{ fontSize: '14px', lineHeight: '1.5', color: '#262626', whiteSpace: 'pre-wrap' }}>
-                      <span style={{ fontWeight: '600', marginRight: '4px' }}>your_brand</span>
+                    <div style={{ fontSize: '14px', lineHeight: '1.6', color: '#262626', whiteSpace: 'pre-wrap' }}>
+                      <span style={{ fontWeight: '600', marginRight: '6px' }}>your_brand</span>
                       {captions.instagram}
                     </div>
                   ) : (
-                    <div style={{ fontSize: '14px', color: '#8e8e8e', fontStyle: 'italic' }}>
+                    <div style={{ fontSize: '14px', color: '#8e8e8e', fontStyle: 'italic', padding: '20px 0' }}>
                       Your caption will appear here...
                     </div>
                   )}
@@ -838,31 +1291,34 @@ Enjoy! 🎉
 
             {activeTab === 'facebook' && (
               <div style={{
-                background: '#fff',
-                borderRadius: '8px',
+                background: '#ffffff',
+                borderRadius: '12px',
                 border: '1px solid #dadde1',
-                maxWidth: '500px',
+                maxWidth: '520px',
                 margin: '0 auto',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                overflow: 'hidden'
               }}>
                 {/* Facebook Header */}
                 <div style={{
-                  padding: '12px 16px',
+                  padding: '14px 16px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '12px'
+                  gap: '12px',
+                  background: '#ffffff'
                 }}>
                   <div style={{
-                    width: '40px',
-                    height: '40px',
+                    width: '44px',
+                    height: '44px',
                     borderRadius: '50%',
-                    background: '#1877f2',
+                    background: 'linear-gradient(135deg, #1877f2 0%, #0d5dbf 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#fff',
-                    fontWeight: '600',
-                    fontSize: '16px'
+                    fontWeight: '700',
+                    fontSize: '17px',
+                    boxShadow: '0 2px 8px rgba(24, 119, 242, 0.3)'
                   }}>
                     YB
                   </div>
@@ -875,20 +1331,23 @@ Enjoy! 🎉
                 {/* Facebook Caption */}
                 {captions.facebook ? (
                   <div style={{ 
-                    padding: '12px 16px', 
+                    padding: '14px 16px', 
                     fontSize: '15px', 
-                    lineHeight: '1.5', 
+                    lineHeight: '1.6', 
                     color: '#050505',
-                    whiteSpace: 'pre-wrap'
+                    whiteSpace: 'pre-wrap',
+                    background: '#ffffff'
                   }}>
                     {captions.facebook}
                   </div>
                 ) : (
                   <div style={{ 
-                    padding: '12px 16px', 
+                    padding: '40px 16px', 
                     fontSize: '15px', 
                     color: '#8e8e8e', 
-                    fontStyle: 'italic' 
+                    fontStyle: 'italic',
+                    textAlign: 'center',
+                    background: '#ffffff'
                   }}>
                     Your Facebook post will appear here...
                   </div>
@@ -913,21 +1372,31 @@ Enjoy! 🎉
 
                 {/* Facebook Actions */}
                 <div style={{ 
-                  padding: '8px 16px',
+                  padding: '10px 16px',
                   borderTop: '1px solid #dadde1',
                   display: 'flex',
                   justifyContent: 'space-around',
                   color: '#65676b',
                   fontSize: '15px',
-                  fontWeight: '600'
+                  fontWeight: '600',
+                  background: '#ffffff'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.2s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#f0f2f5'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
                     <span>👍</span> Like
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.2s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#f0f2f5'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
                     <span>💬</span> Comment
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.2s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#f0f2f5'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
                     <span>📤</span> Share
                   </div>
                 </div>
@@ -937,16 +1406,16 @@ Enjoy! 🎉
             {activeTab === 'webshop' && (
               <div style={{
                 background: '#fff',
-                borderRadius: '8px',
-                border: '1px solid #e5e5e5',
+                borderRadius: '12px',
+                border: '1px solid #e5e7eb',
                 maxWidth: '400px',
                 margin: '0 auto',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                 overflow: 'hidden'
               }}>
                 {/* Product Image */}
                 {currentImage && (
-                  <div style={{ width: '100%', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                  <div style={{ width: '100%', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
                     <img 
                       src={currentImage} 
                       alt="Product" 
@@ -955,49 +1424,68 @@ Enjoy! 🎉
                         maxHeight: '500px',
                         height: 'auto',
                         objectFit: 'contain',
-                        display: 'block'
+                        display: 'block',
+                        borderRadius: '8px'
                       }} 
                     />
                   </div>
                 )}
 
                 {/* Product Info */}
-                <div style={{ padding: '20px' }}>
+                <div style={{ padding: '24px' }}>
                   <div style={{ 
                     fontSize: '24px', 
-                    fontWeight: '600', 
-                    color: '#000', 
-                    marginBottom: '12px' 
+                    fontWeight: '700', 
+                    color: '#1f2937', 
+                    marginBottom: '12px',
+                    minHeight: '32px',
+                    display: 'flex',
+                    alignItems: 'center'
                   }}>
-                    Fashion Item
+                    {productName ? (
+                      <span>{productName}</span>
+                    ) : (
+                      <span style={{ color: '#9ca3af', fontStyle: 'italic', fontWeight: '400' }}>
+                        Enter product name...
+                      </span>
+                    )}
                   </div>
                   
                   <div style={{ 
-                    fontSize: '20px', 
-                    fontWeight: '600', 
-                    color: '#000', 
-                    marginBottom: '16px' 
+                    fontSize: '22px', 
+                    fontWeight: '700', 
+                    color: '#1f2937', 
+                    marginBottom: '20px',
+                    minHeight: '30px',
+                    display: 'flex',
+                    alignItems: 'center'
                   }}>
-                    $99.99
+                    {productPrice ? (
+                      <span>${parseFloat(productPrice.replace(/[^0-9.]/g, '') || '0').toFixed(2)}</span>
+                    ) : (
+                      <span style={{ color: '#9ca3af', fontStyle: 'italic', fontWeight: '400', fontSize: '18px' }}>
+                        Enter price...
+                      </span>
+                    )}
                   </div>
 
                   {/* Product Description */}
                   {captions.webshop ? (
                     <div style={{ 
                       fontSize: '14px', 
-                      lineHeight: '1.6', 
-                      color: '#333',
+                      lineHeight: '1.7', 
+                      color: '#374151',
                       whiteSpace: 'pre-wrap',
-                      marginBottom: '20px'
+                      marginBottom: '24px'
                     }}>
                       {captions.webshop}
                     </div>
                   ) : (
                     <div style={{ 
                       fontSize: '14px', 
-                      color: '#999', 
+                      color: '#9ca3af', 
                       fontStyle: 'italic',
-                      marginBottom: '20px'
+                      marginBottom: '24px'
                     }}>
                       Product description will appear here...
                     </div>
@@ -1006,19 +1494,137 @@ Enjoy! 🎉
                   {/* Add to Cart Button */}
                   <button style={{
                     width: '100%',
-                    padding: '14px',
-                    background: '#000',
+                    padding: '16px',
+                    background: 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
                     color: '#fff',
                     border: 'none',
-                    borderRadius: '6px',
+                    borderRadius: '10px',
                     fontSize: '14px',
-                    fontWeight: '600',
+                    fontWeight: '700',
                     cursor: 'pointer',
                     textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
+                    letterSpacing: '0.5px',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 4px 12px rgba(31, 41, 55, 0.3)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(31, 41, 55, 0.4)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(31, 41, 55, 0.3)'
+                  }}
+                  >
                     Add to Cart
                   </button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'email' && (
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '12px',
+                border: '1px solid #e5e7eb',
+                maxWidth: '600px',
+                margin: '0 auto',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                overflow: 'hidden'
+              }}>
+                {/* Email Header */}
+                <div style={{
+                  background: '#f9fafb',
+                  padding: '16px 20px',
+                  borderBottom: '1px solid #e5e7eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    fontWeight: '700',
+                    fontSize: '16px'
+                  }}>
+                    YB
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>Your Brand</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280' }}>hello@yourbrand.com</div>
+                  </div>
+                </div>
+
+                {/* Email Content */}
+                <div style={{ padding: '24px' }}>
+                  {/* Email Fields */}
+                  <div style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #e5e7eb' }}>
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                        From
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#1f2937' }}>Your Brand &lt;hello@yourbrand.com&gt;</div>
+                    </div>
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                        To
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#1f2937' }}>customer@example.com</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                        Subject
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: '600', color: '#1f2937' }}>
+                        {captions.emailSubject || 'Email subject will appear here...'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Email Image */}
+                  {currentImage && (
+                    <div style={{ width: '100%', marginBottom: '20px', borderRadius: '8px', overflow: 'hidden' }}>
+                      <img 
+                        src={currentImage} 
+                        alt="Email Content" 
+                        style={{ 
+                          width: '100%',
+                          maxHeight: '400px',
+                          height: 'auto',
+                          objectFit: 'contain',
+                          display: 'block'
+                        }} 
+                      />
+                    </div>
+                  )}
+
+                  {/* Email Body */}
+                  {captions.email ? (
+                    <div style={{ 
+                      fontSize: '14px', 
+                      lineHeight: '1.7', 
+                      color: '#374151',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {captions.email}
+                    </div>
+                  ) : (
+                    <div style={{ 
+                      fontSize: '14px', 
+                      color: '#9ca3af', 
+                      fontStyle: 'italic',
+                      padding: '40px 0',
+                      textAlign: 'center'
+                    }}>
+                      Your email content will appear here...
+                    </div>
+                  )}
                 </div>
               </div>
             )}

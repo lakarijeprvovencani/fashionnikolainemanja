@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { editFashionImage } from '../lib/gemini'
-import UserMenu from './UserMenu'
+import { userHistory } from '../lib/supabase'
+import PageHeader from './PageHeader'
 
 interface EditImageViewProps {
   imageUrl: string | null
@@ -15,6 +16,8 @@ const EditImageView: React.FC<EditImageViewProps> = ({ imageUrl, onBack, onImage
   const [editPrompt, setEditPrompt] = useState('')
   const [editingImage, setEditingImage] = useState(false)
   const [error, setError] = useState('')
+  const [imageHistory, setImageHistory] = useState<string[]>([]) // Stack for undo
+  const [redoHistory, setRedoHistory] = useState<string[]>([]) // Stack for redo
   const [currentImage, setCurrentImage] = useState<string | null>(() => {
     // Load from localStorage first, then fallback to prop
     const saved = localStorage.getItem('dressModel_generatedImage')
@@ -38,6 +41,15 @@ const EditImageView: React.FC<EditImageViewProps> = ({ imageUrl, onBack, onImage
     setError('')
     
     try {
+      // Save current image to history before applying new edit
+      const newHistory = [...imageHistory]
+      if (currentImage) {
+        newHistory.push(currentImage)
+      }
+      setImageHistory(newHistory)
+      // Clear redo history when making a new edit
+      setRedoHistory([])
+      
       const editedImageUrl = await editFashionImage({
         imageUrl: currentImage,
         prompt: editPrompt,
@@ -48,6 +60,20 @@ const EditImageView: React.FC<EditImageViewProps> = ({ imageUrl, onBack, onImage
       // Save to localStorage
       localStorage.setItem('dressModel_generatedImage', editedImageUrl)
       if (onImageUpdated) onImageUpdated(editedImageUrl)
+      
+      // Save to activity history
+      if (user?.id) {
+        await userHistory.saveActivity({
+          userId: user.id,
+          activityType: 'edit_image',
+          imageUrl: editedImageUrl,
+          prompt: editPrompt,
+          metadata: {
+            originalImageUrl: currentImage
+          }
+        }).catch(err => console.error('Error saving activity history:', err))
+      }
+      
       setEditPrompt('')
     } catch (err: any) {
       setError(err.message || 'Failed to edit image.')
@@ -56,23 +82,53 @@ const EditImageView: React.FC<EditImageViewProps> = ({ imageUrl, onBack, onImage
     }
   }
 
+  const handleUndo = () => {
+    if (imageHistory.length === 0 || !currentImage) return
+    
+    // Move current image to redo history
+    const newRedoHistory = [...redoHistory, currentImage]
+    setRedoHistory(newRedoHistory)
+    
+    // Restore previous image from history
+    const newHistory = [...imageHistory]
+    const previousImage = newHistory.pop() || null
+    setImageHistory(newHistory)
+    
+    if (previousImage) {
+      setCurrentImage(previousImage)
+      localStorage.setItem('dressModel_generatedImage', previousImage)
+      if (onImageUpdated) onImageUpdated(previousImage)
+    }
+  }
+
+  const handleRedo = () => {
+    if (redoHistory.length === 0) return
+    
+    // Save current image to history
+    if (currentImage) {
+      const newHistory = [...imageHistory, currentImage]
+      setImageHistory(newHistory)
+    }
+    
+    // Restore image from redo history
+    const newRedoHistory = [...redoHistory]
+    const nextImage = newRedoHistory.pop() || null
+    setRedoHistory(newRedoHistory)
+    
+    if (nextImage) {
+      setCurrentImage(nextImage)
+      localStorage.setItem('dressModel_generatedImage', nextImage)
+      if (onImageUpdated) onImageUpdated(nextImage)
+    }
+  }
+
   return (
     <div className="dashboard" style={{ background: '#ffffff', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
-      <header className="dashboard-header" style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f0', padding: '20px 40px', height: '80px' }}>
-        <div className="dashboard-header-content" style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 className="dashboard-title" style={{ color: '#000', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '-0.5px', margin: 0 }}>
-              Edit Image
-            </h1>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <button onClick={onBack} style={{ background: 'transparent', color: '#000', border: '1px solid #e0e0e0', padding: '8px 16px', borderRadius: '0px', fontSize: '13px', cursor: 'pointer' }}>
-              ← Back
-            </button>
-            {onNavigate && <UserMenu onNavigate={onNavigate} />}
-          </div>
-        </div>
-      </header>
+      <PageHeader 
+        title="Edit Image" 
+        onBack={onBack}
+        onNavigate={onNavigate}
+      />
 
       <main className="dashboard-content" style={{ padding: '40px', maxWidth: '1600px', margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '500px 1fr', gap: '60px' }}>
@@ -118,13 +174,93 @@ const EditImageView: React.FC<EditImageViewProps> = ({ imageUrl, onBack, onImage
               </div>
             )}
 
+            {/* Undo/Redo buttons */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+              <button
+                onClick={handleUndo}
+                disabled={imageHistory.length === 0 || editingImage}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: imageHistory.length === 0 || editingImage ? '#f5f5f5' : '#fff',
+                  color: imageHistory.length === 0 || editingImage ? '#ccc' : '#000',
+                  border: '1px solid',
+                  borderColor: imageHistory.length === 0 || editingImage ? '#e0e0e0' : '#d0d0d0',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: imageHistory.length === 0 || editingImage ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+                onMouseEnter={(e) => {
+                  if (imageHistory.length > 0 && !editingImage) {
+                    e.currentTarget.style.background = '#f9f9f9'
+                    e.currentTarget.style.borderColor = '#000'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (imageHistory.length > 0 && !editingImage) {
+                    e.currentTarget.style.background = '#fff'
+                    e.currentTarget.style.borderColor = '#d0d0d0'
+                  }
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 7v6h6M21 17v-6h-6M21 7l-7 7-4-4-7 7"/>
+                </svg>
+                Undo {imageHistory.length > 0 && `(${imageHistory.length})`}
+              </button>
+              <button
+                onClick={handleRedo}
+                disabled={redoHistory.length === 0 || editingImage}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: redoHistory.length === 0 || editingImage ? '#f5f5f5' : '#fff',
+                  color: redoHistory.length === 0 || editingImage ? '#ccc' : '#000',
+                  border: '1px solid',
+                  borderColor: redoHistory.length === 0 || editingImage ? '#e0e0e0' : '#d0d0d0',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: redoHistory.length === 0 || editingImage ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+                onMouseEnter={(e) => {
+                  if (redoHistory.length > 0 && !editingImage) {
+                    e.currentTarget.style.background = '#f9f9f9'
+                    e.currentTarget.style.borderColor = '#000'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (redoHistory.length > 0 && !editingImage) {
+                    e.currentTarget.style.background = '#fff'
+                    e.currentTarget.style.borderColor = '#d0d0d0'
+                  }
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 7v6h-6M3 17v-6h6M3 7l7 7 4-4 7 7"/>
+                </svg>
+                Redo {redoHistory.length > 0 && `(${redoHistory.length})`}
+              </button>
+            </div>
+
             <button
               onClick={handleEditImage}
               disabled={editingImage || !editPrompt.trim()}
               style={{
                 width: '100%',
                 padding: '16px',
-                background: editingImage || !editPrompt.trim() ? '#e0e0e0' : '#000',
+                background: editingImage || !editPrompt.trim() ? '#e0e0e0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 color: editingImage || !editPrompt.trim() ? '#999' : '#fff',
                 border: 'none',
                 fontSize: '13px',
@@ -132,20 +268,20 @@ const EditImageView: React.FC<EditImageViewProps> = ({ imageUrl, onBack, onImage
                 textTransform: 'uppercase',
                 letterSpacing: '1px',
                 cursor: editingImage || !editPrompt.trim() ? 'not-allowed' : 'pointer',
-                borderRadius: '6px',
+                borderRadius: '8px',
                 transition: 'all 0.2s',
-                boxShadow: editingImage || !editPrompt.trim() ? 'none' : '0 4px 12px rgba(0,0,0,0.15)'
+                boxShadow: editingImage || !editPrompt.trim() ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.3)'
               }}
               onMouseEnter={(e) => {
                 if (!editingImage && editPrompt.trim()) {
                   e.currentTarget.style.transform = 'translateY(-1px)'
-                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)'
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)'
                 }
               }}
               onMouseLeave={(e) => {
                 if (!editingImage && editPrompt.trim()) {
                   e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
                 }
               }}
             >
@@ -157,7 +293,7 @@ const EditImageView: React.FC<EditImageViewProps> = ({ imageUrl, onBack, onImage
                 Edit History
               </h3>
               <p style={{ fontSize: '13px', color: '#999', lineHeight: '1.6' }}>
-                Each edit creates a new version. Your original image is preserved.
+                Each edit creates a new version. Use Undo/Redo to navigate through your edit history.
               </p>
             </div>
           </div>

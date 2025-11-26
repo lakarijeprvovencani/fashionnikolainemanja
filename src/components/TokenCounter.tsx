@@ -1,64 +1,54 @@
-import React, { useState, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import { tokens } from '../lib/supabase'
+import React from 'react'
+import { useTokens } from '../contexts/TokenContext'
 
 interface TokenCounterProps {
   onRefresh?: () => void
 }
 
 const TokenCounter: React.FC<TokenCounterProps> = ({ onRefresh }) => {
-  const { user } = useAuth()
-  const [tokenData, setTokenData] = useState({
-    tokens_remaining: 0,
-    tokens_limit: 0,
-    tokens_used: 0,
-    plan_type: 'free',
-    status: 'active',
-    period_end: new Date()
-  })
-  const [loading, setLoading] = useState(false)
+  const { tokenData, loading, refreshTokens } = useTokens()
 
-  const loadTokens = async () => {
-    if (!user) return
-
-    setLoading(true)
-    try {
-      const data = await tokens.getUserTokens(user.id)
-      setTokenData(data)
-    } catch (error) {
-      console.error('Error loading tokens:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadTokens()
-  }, [user])
-
-  const handleRefresh = () => {
-    loadTokens()
+  const handleRefresh = async () => {
+    await refreshTokens()
     if (onRefresh) onRefresh()
   }
 
-  const percentage = tokenData.tokens_limit > 0 
-    ? (tokenData.tokens_remaining / tokenData.tokens_limit) * 100 
+  // Calculate tokens remaining directly to ensure accuracy
+  const getTokensRemaining = () => {
+    return Math.max(0, tokenData.tokens_limit - tokenData.tokens_used)
+  }
+
+  // Calculate usage percentage (how much is USED, not remaining)
+  const usagePercentage = tokenData.tokens_limit > 0 
+    ? (tokenData.tokens_used / tokenData.tokens_limit) * 100 
     : 0
 
+  // Get color based on usage:
+  // - Green (0-50%): Low usage, safe
+  // - Yellow (50-75%): Medium usage, warning
+  // - Red (75%+): High usage, danger
   const getColorClass = () => {
-    if (percentage > 50) return '#48bb78'
-    if (percentage > 20) return '#f6ad55'
-    return '#f56565'
+    if (usagePercentage < 50) return '#48bb78' // Green
+    if (usagePercentage < 75) return '#f6ad55' // Yellow/Orange
+    return '#f56565' // Red
   }
 
   const formatNumber = (num: number) => {
+    if (num >= 1000000) {
+      return `${(num / 1000000).toFixed(1)}M`
+    }
     if (num >= 1000) {
-      return `${(num / 1000).toFixed(1)}K`
+      // Show more precision for numbers close to round thousands
+      const thousands = num / 1000
+      // If it's very close to a round number (like 99.999), show 3 decimals
+      if (thousands % 1 > 0.99 || thousands % 1 < 0.01) {
+        return `${thousands.toFixed(3)}K`
+      }
+      // Otherwise show 1 decimal
+      return `${thousands.toFixed(1)}K`
     }
     return num.toString()
   }
-
-  if (!user) return null
 
   return (
     <div style={{
@@ -92,11 +82,11 @@ const TokenCounter: React.FC<TokenCounterProps> = ({ onRefresh }) => {
             fontWeight: '700',
             color: '#1a202c'
           }}>
-            {loading ? '...' : formatNumber(tokenData.tokens_remaining)}
+            {loading ? '...' : formatNumber(getTokensRemaining())}
           </span>
         </div>
         
-        {/* Progress Bar */}
+        {/* Progress Bar - Shows USAGE (how much is used), not remaining */}
         <div style={{
           width: '100%',
           height: '6px',
@@ -105,10 +95,11 @@ const TokenCounter: React.FC<TokenCounterProps> = ({ onRefresh }) => {
           overflow: 'hidden'
         }}>
           <div style={{
-            width: `${percentage}%`,
+            width: `${Math.min(100, Math.max(0.1, usagePercentage))}%`,
             height: '100%',
             background: getColorClass(),
-            transition: 'width 0.3s ease, background 0.3s ease'
+            transition: 'width 0.3s ease, background 0.3s ease',
+            minWidth: usagePercentage > 0 ? '2px' : '0'
           }} />
         </div>
 

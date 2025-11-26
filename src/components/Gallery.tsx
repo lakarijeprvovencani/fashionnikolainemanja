@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { dressedModels, storage } from '../lib/supabase'
-import UserMenu from './UserMenu'
+import PageHeader from './PageHeader'
 
 interface DressedModel {
   id: string
@@ -96,20 +96,11 @@ const Gallery: React.FC<GalleryProps> = ({ onBack, onNavigate }) => {
 
   return (
     <div className="dashboard" style={{ background: '#ffffff', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
-      <header className="dashboard-header" style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f0', padding: '20px 40px', height: '80px' }}>
-        <div className="dashboard-header-content" style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 className="dashboard-title" style={{ color: '#000', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '-0.5px', margin: 0 }}>Gallery</h1>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <button onClick={onBack} className="btn-signout" style={{ background: 'transparent', color: '#000', border: '1px solid #e0e0e0', padding: '8px 16px', borderRadius: '0px', fontSize: '13px', cursor: 'pointer' }}>
-              ← Back
-            </button>
-            {onNavigate && <UserMenu onNavigate={onNavigate} />}
-          </div>
-        </div>
-      </header>
-
+      <PageHeader 
+        title="Gallery" 
+        onBack={onBack}
+        onNavigate={onNavigate}
+      />
       <main className="dashboard-content" style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto' }}>
         {error && (
           <div style={{ padding: '15px', background: '#fff5f5', color: '#c53030', border: '1px solid #feb2b2', marginBottom: '30px' }}>

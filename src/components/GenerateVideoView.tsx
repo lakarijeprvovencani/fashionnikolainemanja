@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { generateFashionVideo } from '../lib/gemini'
-import UserMenu from './UserMenu'
+import { userHistory } from '../lib/supabase'
+import PageHeader from './PageHeader'
 
 interface GenerateVideoViewProps {
   imageUrl: string | null
@@ -46,6 +47,18 @@ const GenerateVideoView: React.FC<GenerateVideoViewProps> = ({ imageUrl, onBack,
       })
       
       setGeneratedVideo(videoUrl)
+      
+      // Save to activity history
+      if (user?.id) {
+        await userHistory.saveActivity({
+          userId: user.id,
+          activityType: 'generate_video',
+          videoUrl: videoUrl,
+          imageUrl: imageToUse,
+          prompt: videoPrompt || 'Fashion model posing elegantly, subtle movements, cinematic lighting',
+          metadata: {}
+        }).catch(err => console.error('Error saving activity history:', err))
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to generate video.')
     } finally {
@@ -55,21 +68,11 @@ const GenerateVideoView: React.FC<GenerateVideoViewProps> = ({ imageUrl, onBack,
 
   return (
     <div className="dashboard" style={{ background: '#ffffff', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
-      <header className="dashboard-header" style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f0', padding: '20px 40px', height: '80px' }}>
-        <div className="dashboard-header-content" style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 className="dashboard-title" style={{ color: '#000', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '-0.5px', margin: 0 }}>
-              Generate Video
-            </h1>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <button onClick={onBack} style={{ background: 'transparent', color: '#000', border: '1px solid #e0e0e0', padding: '8px 16px', borderRadius: '0px', fontSize: '13px', cursor: 'pointer' }}>
-              ← Back
-            </button>
-            {onNavigate && <UserMenu onNavigate={onNavigate} />}
-          </div>
-        </div>
-      </header>
+      <PageHeader 
+        title="Generate Video" 
+        onBack={onBack}
+        onNavigate={onNavigate}
+      />
 
       <main className="dashboard-content" style={{ padding: '40px', maxWidth: '1600px', margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '500px 1fr', gap: '60px' }}>
@@ -123,7 +126,7 @@ const GenerateVideoView: React.FC<GenerateVideoViewProps> = ({ imageUrl, onBack,
                 style={{
                   width: '100%',
                   padding: '16px',
-                  background: generatingVideo ? '#e0e0e0' : '#000',
+                  background: generatingVideo ? '#e0e0e0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   color: generatingVideo ? '#999' : '#fff',
                   border: 'none',
                   fontSize: '13px',
@@ -131,20 +134,20 @@ const GenerateVideoView: React.FC<GenerateVideoViewProps> = ({ imageUrl, onBack,
                   textTransform: 'uppercase',
                   letterSpacing: '1px',
                   cursor: generatingVideo ? 'not-allowed' : 'pointer',
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   transition: 'all 0.2s',
-                  boxShadow: generatingVideo ? 'none' : '0 4px 12px rgba(0,0,0,0.15)'
+                  boxShadow: generatingVideo ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.3)'
                 }}
                 onMouseEnter={(e) => {
                   if (!generatingVideo) {
                     e.currentTarget.style.transform = 'translateY(-1px)'
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)'
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)'
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!generatingVideo) {
                     e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
                   }
                 }}
               >
@@ -161,7 +164,7 @@ const GenerateVideoView: React.FC<GenerateVideoViewProps> = ({ imageUrl, onBack,
                     display: 'block',
                     width: '100%',
                     padding: '16px',
-                    background: '#000',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     color: '#fff',
                     border: 'none',
                     fontSize: '13px',
@@ -169,11 +172,19 @@ const GenerateVideoView: React.FC<GenerateVideoViewProps> = ({ imageUrl, onBack,
                     textTransform: 'uppercase',
                     letterSpacing: '1px',
                     cursor: 'pointer',
-                    borderRadius: '6px',
+                    borderRadius: '8px',
                     textAlign: 'center',
                     textDecoration: 'none',
                     transition: 'all 0.2s',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)'
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
+                    e.currentTarget.style.transform = 'translateY(0)'
                   }}
                 >
                   💾 Download Video

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { TokenProvider } from './contexts/TokenContext'
 import Login from './components/Login'
 import SignUp from './components/SignUp'
 import Dashboard from './components/Dashboard'
@@ -33,7 +34,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <AppContent />
+      <TokenProvider>
+        <AppContent />
+      </TokenProvider>
     </AuthProvider>
   )
 }

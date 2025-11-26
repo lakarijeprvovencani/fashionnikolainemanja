@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
+import { supabase, userHistory } from '../lib/supabase'
 import { generateFashionModel, generateModelFromUploadedImage } from '../lib/gemini'
-import UserMenu from './UserMenu'
+import PageHeader from './PageHeader'
 
 interface CreateModelProps {
   mode?: 'upload' | 'ai'
@@ -215,6 +215,27 @@ const CreateModel: React.FC<CreateModelProps> = ({ mode = 'ai', onBack, onViewMo
 
       if (dbError) throw dbError
 
+      // Save to activity history
+      if (user?.id) {
+        await userHistory.saveActivity({
+          userId: user.id,
+          activityType: 'create_model',
+          imageUrl: publicUrl,
+          metadata: {
+            modelName: modelName,
+            mode: mode,
+            modelData: mode === 'upload' ? null : {
+              gender,
+              bodyType,
+              ethnicity,
+              hairColor,
+              eyeColor,
+              hasBeard
+            }
+          }
+        }).catch(err => console.error('Error saving activity history:', err))
+      }
+
       if (onViewModels) onViewModels()
     } catch (err: any) {
       setError(err.message || 'Failed to save model')
@@ -229,13 +250,15 @@ const CreateModel: React.FC<CreateModelProps> = ({ mode = 'ai', onBack, onViewMo
       style={{
         flex: 1,
         padding: '12px',
-        background: selected ? '#000' : '#fff',
+        background: selected ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#fff',
         color: selected ? '#fff' : '#000',
-        border: selected ? '1px solid #000' : '1px solid #e0e0e0',
+        border: selected ? 'none' : '1px solid #e0e0e0',
         fontSize: '13px',
         fontWeight: '500',
         cursor: 'pointer',
-        transition: 'all 0.2s'
+        transition: 'all 0.2s',
+        borderRadius: '8px',
+        boxShadow: selected ? '0 2px 8px rgba(102, 126, 234, 0.2)' : 'none'
       }}
     >
       {label}
@@ -244,21 +267,11 @@ const CreateModel: React.FC<CreateModelProps> = ({ mode = 'ai', onBack, onViewMo
 
   return (
     <div className="dashboard" style={{ background: '#ffffff', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
-      <header className="dashboard-header" style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f0', padding: '20px 40px', height: '80px' }}>
-        <div className="dashboard-header-content" style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 className="dashboard-title" style={{ color: '#000', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '-0.5px', margin: 0 }}>
-              {mode === 'upload' ? 'Myself as Model' : 'Generate AI Model'}
-            </h1>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <button onClick={onBack || (() => window.history.back())} className="btn-signout" style={{ background: 'transparent', color: '#000', border: '1px solid #e0e0e0', padding: '8px 16px', borderRadius: '0px', fontSize: '13px', cursor: 'pointer' }}>
-              ← Back
-            </button>
-            {onNavigate && <UserMenu onNavigate={onNavigate} />}
-          </div>
-        </div>
-      </header>
+      <PageHeader 
+        title={mode === 'upload' ? 'Myself as Model' : 'Generate AI Model'} 
+        onBack={onBack || (() => window.history.back())}
+        onNavigate={onNavigate}
+      />
 
       <main className="dashboard-content" style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
         {!success ? (
@@ -357,15 +370,29 @@ const CreateModel: React.FC<CreateModelProps> = ({ mode = 'ai', onBack, onViewMo
                     style={{
                       width: '100%',
                       padding: '16px',
-                      background: '#000',
-                      color: '#fff',
+                      background: loading || !uploadedImage ? '#e0e0e0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: loading || !uploadedImage ? '#999' : '#fff',
                       border: 'none',
                       fontSize: '13px',
                       fontWeight: '600',
                       textTransform: 'uppercase',
                       letterSpacing: '1px',
                       cursor: loading || !uploadedImage ? 'not-allowed' : 'pointer',
-                      opacity: loading || !uploadedImage ? 0.7 : 1
+                      borderRadius: '8px',
+                      transition: 'all 0.2s',
+                      boxShadow: loading || !uploadedImage ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.3)'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading && uploadedImage) {
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)'
+                        e.currentTarget.style.transform = 'translateY(-1px)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!loading && uploadedImage) {
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
+                        e.currentTarget.style.transform = 'translateY(0)'
+                      }
                     }}
                   >
                     {loading ? 'Processing...' : 'Save Model'}
@@ -473,15 +500,29 @@ const CreateModel: React.FC<CreateModelProps> = ({ mode = 'ai', onBack, onViewMo
                     style={{
                       width: '100%',
                       padding: '16px',
-                      background: '#000',
-                      color: '#fff',
+                      background: loading ? '#e0e0e0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: loading ? '#999' : '#fff',
                       border: 'none',
                       fontSize: '13px',
                       fontWeight: '600',
                       textTransform: 'uppercase',
                       letterSpacing: '1px',
                       cursor: loading ? 'not-allowed' : 'pointer',
-                      opacity: loading ? 0.7 : 1
+                      borderRadius: '8px',
+                      transition: 'all 0.2s',
+                      boxShadow: loading ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.3)'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading) {
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)'
+                        e.currentTarget.style.transform = 'translateY(-1px)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!loading) {
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
+                        e.currentTarget.style.transform = 'translateY(0)'
+                      }
                     }}
                   >
                     {loading ? 'Generating Model...' : 'Generate Model'}
@@ -513,7 +554,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ mode = 'ai', onBack, onViewMo
         ) : (
           // SUCCESS STATE - REVIEW & SAVE
           <div style={{ textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
-            <div style={{ width: '40px', height: '40px', background: '#000', color: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)' }}>
               ✓
             </div>
             <h2 style={{ fontSize: '24px', fontWeight: '300', color: '#000', marginBottom: '30px' }}>Model Created Successfully</h2>
@@ -568,15 +609,29 @@ const CreateModel: React.FC<CreateModelProps> = ({ mode = 'ai', onBack, onViewMo
                 style={{
                   flex: 1,
                   padding: '16px',
-                  background: '#000',
-                  color: '#fff',
+                  background: loading ? '#e0e0e0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: loading ? '#999' : '#fff',
                   border: 'none',
                   fontSize: '13px',
                   fontWeight: '600',
                   textTransform: 'uppercase',
                   letterSpacing: '1px',
                   cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.7 : 1
+                  borderRadius: '8px',
+                  transition: 'all 0.2s',
+                  boxShadow: loading ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.3)'
+                }}
+                onMouseEnter={(e) => {
+                  if (!loading) {
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)'
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!loading) {
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }
                 }}
               >
                 {loading ? 'Saving...' : 'Save to Studio'}

@@ -1,46 +1,35 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { tokens, subscriptions } from '../lib/supabase'
+import { useTokens } from '../contexts/TokenContext'
+import { subscriptions } from '../lib/supabase'
+import PageHeader from './PageHeader'
 
 interface SubscriptionDashboardProps {
   compact?: boolean
   onUpgrade?: () => void
+  onBack?: () => void
+  onNavigate?: (view: string) => void
 }
 
-const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact = false, onUpgrade }) => {
+const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact = false, onUpgrade, onBack, onNavigate }) => {
   const { user } = useAuth()
-  const [tokenData, setTokenData] = useState({
-    tokens_remaining: 0,
-    tokens_limit: 0,
-    tokens_used: 0,
-    plan_type: 'free',
-    status: 'active',
-    period_end: new Date()
-  })
+  const { tokenData, loading, refreshTokens } = useTokens()
   const [subscription, setSubscription] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
   const [cancelling, setCancelling] = useState(false)
+  const [reactivating, setReactivating] = useState(false)
 
   useEffect(() => {
-    loadData()
+    loadSubscriptionData()
   }, [user])
 
-  const loadData = async () => {
+  const loadSubscriptionData = async () => {
     if (!user) return
 
-    setLoading(true)
     try {
-      const [tokenInfo, subInfo] = await Promise.all([
-        tokens.getUserTokens(user.id),
-        subscriptions.getUserSubscription(user.id)
-      ])
-      
-      setTokenData(tokenInfo)
+      const subInfo = await subscriptions.getUserSubscription(user.id)
       setSubscription(subInfo.data)
     } catch (error) {
       console.error('Error loading subscription data:', error)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -65,12 +54,50 @@ const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact =
         alert('❌ Failed to cancel subscription: ' + error.message)
       } else {
         alert('✅ Subscription cancelled successfully!\n\nYou can continue using your tokens until ' + new Date(tokenData.period_end).toLocaleDateString())
-        loadData() // Refresh data
+        // Refresh token data to update plan display
+        await refreshTokens() // Refresh token data
+        await loadSubscriptionData() // Refresh subscription data
+        // Trigger token update event to refresh UserMenu
+        window.dispatchEvent(new Event('tokens-updated'))
       }
     } catch (error: any) {
       alert('❌ Error: ' + error.message)
     } finally {
       setCancelling(false)
+    }
+  }
+
+  const handleReactivateSubscription = async () => {
+    if (!user || !tokenData.plan_type) return
+    
+    const confirmed = window.confirm(
+      '🔄 Reactivate your subscription?\n\n' +
+      '• Your subscription will be reactivated\n' +
+      '• Plan: ' + getPlanDisplayName(tokenData.plan_type) + '\n' +
+      '• You will regain access to all premium features\n\n' +
+      'Continue?'
+    )
+    
+    if (!confirmed) return
+    
+    setReactivating(true)
+    try {
+      const { error } = await subscriptions.reactivateSubscription(user.id)
+      
+      if (error) {
+        alert('❌ Failed to reactivate subscription: ' + error.message)
+      } else {
+        alert('✅ Subscription reactivated successfully!')
+        // Refresh token data to update plan display
+        await refreshTokens() // Refresh token data
+        await loadSubscriptionData() // Refresh subscription data
+        // Trigger token update event to refresh UserMenu
+        window.dispatchEvent(new Event('tokens-updated'))
+      }
+    } catch (error: any) {
+      alert('❌ Error: ' + error.message)
+    } finally {
+      setReactivating(false)
     }
   }
 
@@ -84,7 +111,20 @@ const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact =
 
   const getUsagePercentage = () => {
     if (tokenData.tokens_limit === 0) return 0
-    return Math.round((tokenData.tokens_used / tokenData.tokens_limit) * 100)
+    const percentage = (tokenData.tokens_used / tokenData.tokens_limit) * 100
+    // Show at least 3 decimal places for small percentages
+    if (percentage < 0.001) return 0.001
+    return Math.max(0.001, percentage)
+  }
+
+  const formatPercentage = (percentage: number) => {
+    if (percentage < 0.01) {
+      return percentage.toFixed(3) + '%'
+    } else if (percentage < 1) {
+      return percentage.toFixed(2) + '%'
+    } else {
+      return percentage.toFixed(1) + '%'
+    }
   }
 
   const getPlanDisplayName = (planType: string) => {
@@ -98,10 +138,25 @@ const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact =
   }
 
   const formatNumber = (num: number) => {
+    if (num >= 1000000) {
+      return `${(num / 1000000).toFixed(1)}M`
+    }
     if (num >= 1000) {
-      return `${(num / 1000).toFixed(1)}K`
+      // Show more precision for numbers close to round thousands
+      const thousands = num / 1000
+      // If it's very close to a round number (like 99.999), show 3 decimals
+      if (thousands % 1 > 0.99 || thousands % 1 < 0.01) {
+        return `${thousands.toFixed(3)}K`
+      }
+      // Otherwise show 1 decimal
+      return `${thousands.toFixed(1)}K`
     }
     return num.toString()
+  }
+  
+  // Calculate tokens_remaining directly from tokenData to ensure accuracy
+  const getTokensRemaining = () => {
+    return Math.max(0, tokenData.tokens_limit - tokenData.tokens_used)
   }
 
   if (!user) return null
@@ -116,41 +171,66 @@ const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact =
   }
 
   return (
-    <div className="welcome-card" style={{ background: '#ffffff', boxShadow: 'none', border: '1px solid #f0f0f0', padding: '40px', fontFamily: '"Inter", sans-serif' }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '40px'
-      }}>
-        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '300', color: '#000', letterSpacing: '-0.5px' }}>
-          Subscription Status
-        </h2>
-        <div style={{
-          padding: '6px 16px',
-          background: '#000',
-          color: '#fff',
-          fontSize: '12px',
-          fontWeight: '600',
-          textTransform: 'uppercase',
-          letterSpacing: '1px'
-        }}>
-          {getPlanDisplayName(tokenData.plan_type)}
-        </div>
-      </div>
+    <div style={{ background: '#ffffff', fontFamily: '"Inter", sans-serif', minHeight: '100vh' }}>
+      {!compact && (
+        <PageHeader 
+          title="Subscription" 
+          onBack={onBack}
+          onNavigate={onNavigate}
+        />
+      )}
+      
+      <div style={{ padding: compact ? '0' : '60px 24px', maxWidth: '1200px', margin: '0 auto' }}>
+        {!compact && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            marginBottom: '50px',
+            paddingTop: '20px',
+            paddingBottom: '20px',
+            borderBottom: '1px solid #f0f0f0'
+          }}>
+            <div style={{
+              padding: '8px 20px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: '#fff',
+              fontSize: '12px',
+              fontWeight: '600',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(102, 126, 234, 0.2)'
+            }}>
+              {getPlanDisplayName(tokenData.plan_type)}
+            </div>
+          </div>
+        )}
 
-      {/* Stats Grid - Minimalist */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '20px',
-        marginBottom: '40px'
-      }}>
+        {/* Stats Grid - Minimalist */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '24px',
+          marginBottom: '50px'
+        }}>
         <div style={{
           background: '#fff',
-          padding: '24px',
-          border: '1px solid #e0e0e0'
-        }}>
+          padding: '28px',
+          border: '1px solid #e0e0e0',
+          borderRadius: '12px',
+          transition: 'all 0.2s',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = '#667eea'
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.1)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = '#e0e0e0'
+          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)'
+        }}
+        >
           <div style={{
             fontSize: '11px',
             color: '#999',
@@ -167,7 +247,7 @@ const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact =
             color: '#000',
             marginBottom: '4px'
           }}>
-            {formatNumber(tokenData.tokens_remaining)}
+            {formatNumber(getTokensRemaining())}
           </div>
           <div style={{ fontSize: '12px', color: '#999' }}>
             Tokens available
@@ -176,9 +256,21 @@ const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact =
 
         <div style={{
           background: '#fff',
-          padding: '24px',
-          border: '1px solid #e0e0e0'
-        }}>
+          padding: '28px',
+          border: '1px solid #e0e0e0',
+          borderRadius: '12px',
+          transition: 'all 0.2s',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = '#667eea'
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.1)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = '#e0e0e0'
+          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)'
+        }}
+        >
           <div style={{
             fontSize: '11px',
             color: '#999',
@@ -204,9 +296,21 @@ const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact =
 
         <div style={{
           background: '#fff',
-          padding: '24px',
-          border: '1px solid #e0e0e0'
-        }}>
+          padding: '28px',
+          border: '1px solid #e0e0e0',
+          borderRadius: '12px',
+          transition: 'all 0.2s',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = '#667eea'
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.1)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = '#e0e0e0'
+          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)'
+        }}
+        >
           <div style={{
             fontSize: '11px',
             color: '#999',
@@ -246,21 +350,24 @@ const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact =
             Monthly Usage
           </span>
           <span style={{ fontSize: '12px', fontWeight: '600', color: '#000' }}>
-            {getUsagePercentage()}%
+            {formatPercentage(getUsagePercentage())}
           </span>
         </div>
         
         <div style={{
           width: '100%',
-          height: '4px',
+          height: '6px',
           background: '#f0f0f0',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          borderRadius: '3px'
         }}>
           <div style={{
-            width: `${getUsagePercentage()}%`,
+            width: `${Math.min(100, Math.max(0.1, getUsagePercentage()))}%`,
             height: '100%',
-            background: '#000',
-            transition: 'width 0.3s ease'
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            transition: 'width 0.3s ease',
+            borderRadius: '3px',
+            minWidth: getUsagePercentage() > 0 ? '2px' : '0'
           }} />
         </div>
       </div>
@@ -284,19 +391,30 @@ const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact =
           <button
             style={{
               padding: '14px 32px',
-              background: '#000',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               color: '#fff',
               border: 'none',
               fontSize: '13px',
               fontWeight: '600',
               cursor: 'pointer',
               textTransform: 'uppercase',
-              letterSpacing: '1px'
+              letterSpacing: '1px',
+              borderRadius: '8px',
+              transition: 'all 0.2s',
+              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
             }}
             onClick={() => {
               if (onUpgrade) {
                 onUpgrade()
               }
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)'
+              e.currentTarget.style.transform = 'translateY(-1px)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
+              e.currentTarget.style.transform = 'translateY(0)'
             }}
           >
             Upgrade Plan
@@ -316,27 +434,30 @@ const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact =
             onClick={handleCancelSubscription}
             disabled={cancelling}
             style={{
-              padding: '10px 20px',
+              padding: '12px 24px',
               background: 'transparent',
               color: '#999',
               border: '1px solid #e0e0e0',
               fontSize: '12px',
-              fontWeight: '500',
+              fontWeight: '600',
               cursor: cancelling ? 'not-allowed' : 'pointer',
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              borderRadius: '8px'
             }}
             onMouseEnter={(e) => {
               if (!cancelling) {
-                e.currentTarget.style.color = '#000'
-                e.currentTarget.style.borderColor = '#000'
+                e.currentTarget.style.color = '#dc2626'
+                e.currentTarget.style.borderColor = '#dc2626'
+                e.currentTarget.style.background = 'rgba(220, 38, 38, 0.05)'
               }
             }}
             onMouseLeave={(e) => {
               if (!cancelling) {
                 e.currentTarget.style.color = '#999'
                 e.currentTarget.style.borderColor = '#e0e0e0'
+                e.currentTarget.style.background = 'transparent'
               }
             }}
           >
@@ -379,27 +500,41 @@ const SubscriptionDashboard: React.FC<SubscriptionDashboardProps> = ({ compact =
             Access until: {new Date(tokenData.period_end).toLocaleDateString()}
           </p>
           <button
+            onClick={handleReactivateSubscription}
+            disabled={reactivating}
             style={{
               padding: '12px 24px',
-              background: '#000',
+              background: reactivating ? '#ccc' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               color: '#fff',
               border: 'none',
               fontSize: '12px',
               fontWeight: '600',
-              cursor: 'pointer',
+              cursor: reactivating ? 'not-allowed' : 'pointer',
               textTransform: 'uppercase',
-              letterSpacing: '1px'
+              letterSpacing: '1px',
+              borderRadius: '8px',
+              transition: 'all 0.2s',
+              boxShadow: reactivating ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.3)',
+              opacity: reactivating ? 0.7 : 1
             }}
-            onClick={() => {
-              if (onUpgrade) {
-                onUpgrade()
+            onMouseEnter={(e) => {
+              if (!reactivating) {
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)'
+                e.currentTarget.style.transform = 'translateY(-1px)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!reactivating) {
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
+                e.currentTarget.style.transform = 'translateY(0)'
               }
             }}
           >
-            Reactivate
+            {reactivating ? 'Processing...' : 'Reactivate'}
           </button>
         </div>
       )}
+      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { subscriptions } from '../lib/supabase'
-import UserMenu from './UserMenu'
+import PageHeader from './PageHeader'
 
 interface PricingProps {
   onBack?: () => void
@@ -85,21 +85,11 @@ const Pricing: React.FC<PricingProps> = ({ onBack, onSuccess, onNavigate }) => {
 
   return (
     <div className="dashboard" style={{ background: '#ffffff', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
-      <header className="dashboard-header" style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f0', padding: '20px 40px', height: '80px' }}>
-        <div className="dashboard-header-content" style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 className="dashboard-title" style={{ color: '#000', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '-0.5px', margin: 0 }}>Plans</h1>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            {onBack && (
-              <button onClick={onBack} className="btn-signout" style={{ background: 'transparent', color: '#000', border: '1px solid #e0e0e0', padding: '8px 16px', borderRadius: '0px', fontSize: '13px', cursor: 'pointer' }}>
-                ← Back
-              </button>
-            )}
-            {onNavigate && <UserMenu onNavigate={onNavigate} />}
-          </div>
-        </div>
-      </header>
+      <PageHeader 
+        title="Pricing Plans" 
+        onBack={onBack}
+        onNavigate={onNavigate}
+      />
 
       <main className="dashboard-content" style={{ padding: '60px 20px', maxWidth: '1200px', margin: '0 auto' }}>
         

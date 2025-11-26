@@ -353,6 +353,169 @@ export const dressedModels = {
   }
 }
 
+// User Activity History - tracks all user actions
+export const userHistory = {
+  // Save activity to history
+  async saveActivity(data: {
+    userId: string
+    activityType: 'generate_image' | 'edit_image' | 'generate_video' | 'create_captions' | 'create_model' | 'dress_model'
+    imageUrl?: string
+    videoUrl?: string
+    modelId?: string
+    prompt?: string
+    scenePrompt?: string
+    captions?: {
+      instagram?: string
+      webshop?: string
+      facebook?: string
+      email?: string
+    }
+    metadata?: any
+  }) {
+    const { data: result, error } = await supabase
+      .from('user_activity_history')
+      .insert({
+        user_id: data.userId,
+        activity_type: data.activityType,
+        image_url: data.imageUrl || null,
+        video_url: data.videoUrl || null,
+        model_id: data.modelId || null,
+        prompt: data.prompt || null,
+        scene_prompt: data.scenePrompt || null,
+        captions_data: data.captions || null,
+        metadata: data.metadata || {},
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    return { data: result, error }
+  },
+
+  // Get user activity history (last N days)
+  async getUserHistory(userId: string, days: number = 15) {
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - days)
+    
+    const { data, error } = await supabase
+      .from('user_activity_history')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('created_at', cutoffDate.toISOString())
+      .order('created_at', { ascending: false })
+    
+    return { data, error }
+  },
+
+  // Clean up old history (older than retention days)
+  async cleanupOldHistory(retentionDays: number = 15) {
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
+    
+    const { data, error } = await supabase
+      .from('user_activity_history')
+      .delete()
+      .lt('created_at', cutoffDate.toISOString())
+      .select()
+    
+    return { data, error }
+  },
+
+  // Get activity count for user
+  async getActivityCount(userId: string, days: number = 15) {
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - days)
+    
+    const { count, error } = await supabase
+      .from('user_activity_history')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', cutoffDate.toISOString())
+    
+    return { count: count || 0, error }
+  }
+}
+
+// User Clothing Library - stores processed clothing images for reuse
+export const clothingLibrary = {
+  // Save processed clothing image to library
+  async saveClothingImage(data: {
+    userId: string
+    originalImageUrl: string
+    processedImageUrl: string
+    thumbnailUrl?: string
+    fileName?: string
+    fileSize?: number
+    metadata?: any
+  }) {
+    const { data: result, error } = await supabase
+      .from('user_clothing_library')
+      .insert({
+        user_id: data.userId,
+        original_image_url: data.originalImageUrl,
+        processed_image_url: data.processedImageUrl,
+        thumbnail_url: data.thumbnailUrl || data.processedImageUrl,
+        file_name: data.fileName || 'clothing-item.png',
+        file_size: data.fileSize || 0,
+        metadata: data.metadata || {}
+      })
+      .select()
+      .single()
+    
+    return { data: result, error }
+  },
+
+  // Get user's clothing library (most recently used first)
+  async getUserClothingLibrary(userId: string, limit: number = 50) {
+    const { data, error } = await supabase
+      .from('user_clothing_library')
+      .select('*')
+      .eq('user_id', userId)
+      .order('last_used_at', { ascending: false, nullsFirst: false })
+      .order('uploaded_at', { ascending: false })
+      .limit(limit)
+    
+    return { data, error }
+  },
+
+  // Update usage when clothing is used
+  async markAsUsed(clothingId: string) {
+    // First get current count
+    const { data: current, error: fetchError } = await supabase
+      .from('user_clothing_library')
+      .select('usage_count')
+      .eq('id', clothingId)
+      .single()
+    
+    if (fetchError || !current) {
+      return { data: null, error: fetchError }
+    }
+    
+    // Then update with incremented count
+    const { data, error } = await supabase
+      .from('user_clothing_library')
+      .update({
+        last_used_at: new Date().toISOString(),
+        usage_count: (current.usage_count || 0) + 1
+      })
+      .eq('id', clothingId)
+      .select()
+      .single()
+    
+    return { data, error }
+  },
+
+  // Delete clothing from library
+  async deleteClothing(clothingId: string) {
+    const { error } = await supabase
+      .from('user_clothing_library')
+      .delete()
+      .eq('id', clothingId)
+    
+    return { error }
+  }
+}
+
 // Token management functions
 export const tokens = {
   // Get user's token balance
@@ -363,18 +526,55 @@ export const tokens = {
     
     if (error) {
       console.error('Error fetching user tokens:', error)
-      return { 
-        tokens_remaining: 0, 
-        tokens_limit: 0, 
-        tokens_used: 0, 
-        plan_type: 'free',
-        status: 'active',
-        period_end: new Date(),
-        error 
+      // Fallback: try to get directly from subscriptions table
+      const { data: subData, error: subError } = await supabase
+        .from('subscriptions')
+        .select('tokens_limit, tokens_used, plan_type, status, current_period_end')
+        .eq('user_id', userId)
+        .single()
+      
+      if (subError || !subData) {
+        return { 
+          tokens_remaining: 0, 
+          tokens_limit: 0, 
+          tokens_used: 0, 
+          plan_type: 'free',
+          status: 'active',
+          period_end: new Date(),
+          error 
+        }
+      }
+      
+      // Calculate tokens_remaining manually
+      const tokens_remaining = Math.max(0, subData.tokens_limit - subData.tokens_used)
+      
+      return {
+        tokens_remaining,
+        tokens_limit: subData.tokens_limit,
+        tokens_used: subData.tokens_used,
+        plan_type: subData.plan_type,
+        status: subData.status,
+        period_end: new Date(subData.current_period_end || new Date()),
+        error: null
       }
     }
     
-    return { ...data, error: null }
+    // Ensure tokens_remaining is calculated correctly
+    const tokens_remaining = data.tokens_limit - data.tokens_used
+    const result = {
+      ...data,
+      tokens_remaining: Math.max(0, tokens_remaining), // Ensure non-negative
+      error: null
+    }
+    
+    console.log('📊 Token balance fetched:', {
+      tokens_limit: result.tokens_limit,
+      tokens_used: result.tokens_used,
+      tokens_remaining: result.tokens_remaining,
+      calculated: tokens_remaining
+    })
+    
+    return result
   },
 
   // Check if user has enough tokens
@@ -434,6 +634,13 @@ export const tokens = {
         })
 
       if (logError) console.error('Error logging transaction:', logError)
+
+      // Trigger token update event immediately after successful deduction
+      // This ensures UI updates in real-time
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('tokens-updated'))
+        console.log('🔄 Token update event dispatched - UI should refresh now')
+      }
 
       return { success: true, balanceAfter, error: null }
     } catch (error: any) {
@@ -681,6 +888,30 @@ export const subscriptions = {
     const { data, error } = await supabase
       .from('subscriptions')
       .update({ status: 'cancelled' })
+      .eq('user_id', userId)
+      .select()
+      .single()
+    
+    return { data, error }
+  },
+
+  // Reactivate cancelled subscription
+  async reactivateSubscription(userId: string) {
+    // Get current subscription to preserve plan_type and other data
+    const { data: currentSub, error: fetchError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+    
+    if (fetchError || !currentSub) {
+      return { data: null, error: fetchError || new Error('Subscription not found') }
+    }
+
+    // Update status back to active
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .update({ status: 'active' })
       .eq('user_id', userId)
       .select()
       .single()

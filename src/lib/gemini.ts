@@ -1,5 +1,6 @@
 import { GoogleGenAI, Modality } from '@google/genai'
 import { tokens } from './supabase'
+import { notifyTokenUpdate } from '../contexts/TokenContext'
 
 // Gemini API key - must be set in .env file
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY
@@ -80,6 +81,7 @@ export const generateFashionModel = async (options: GenerateModelOptions): Promi
       
       if (success) {
         console.log(`✅ Tokens deducted. Balance: ${balanceAfter}`)
+        notifyTokenUpdate() // Notify UI to refresh token display
       } else {
         console.warn('⚠️ Token deduction failed but image was generated')
       }
@@ -390,6 +392,7 @@ The person's identity MUST remain unchanged. Only clothing, pose, and scene can 
       
       if (success) {
         console.log(`✅ Tokens deducted. Balance: ${balanceAfter}`)
+        notifyTokenUpdate() // Notify UI to refresh token display
       } else {
         console.warn('⚠️ Token deduction failed but image was generated')
       }
@@ -409,15 +412,70 @@ interface GenerateCaptionsOptions {
   imageUrl: string
   clothingDescription?: string
   sceneDescription?: string
+  instagramOptions?: {
+    tone?: 'casual' | 'medium' | 'formal'
+    length?: 'short' | 'medium' | 'long'
+    hashtags?: boolean
+  }
+  facebookOptions?: {
+    tone?: 'casual' | 'medium' | 'formal'
+    length?: 'short' | 'medium' | 'long'
+  }
+  emailOptions?: {
+    tone?: 'casual' | 'medium' | 'formal'
+    length?: 'short' | 'medium' | 'long'
+  }
 }
 
 export const generateSocialMediaCaptions = async (options: GenerateCaptionsOptions): Promise<{
   instagram: string
   webshop: string
   facebook: string
+  email: string
+  emailSubject: string
 }> => {
   try {
-    const { imageUrl, clothingDescription, sceneDescription } = options
+    const { imageUrl, clothingDescription, sceneDescription, instagramOptions, facebookOptions, emailOptions } = options
+    
+    // Default options
+    const instagramTone = instagramOptions?.tone || 'medium'
+    const instagramLength = instagramOptions?.length || 'medium'
+    const instagramHashtags = instagramOptions?.hashtags ?? true
+
+    const facebookTone = facebookOptions?.tone || 'casual'
+    const facebookLength = facebookOptions?.length || 'medium'
+
+    const emailTone = emailOptions?.tone || 'medium'
+    const emailLength = emailOptions?.length || 'medium'
+    
+    // Build Instagram prompt based on options
+    const instagramToneDesc = instagramTone === 'casual' ? 'casual, relaxed, friendly' : 
+                              instagramTone === 'formal' ? 'professional, polished, refined' : 
+                              'medium, conversational (not too formal, not too casual)'
+    
+    const instagramLengthDesc = instagramLength === 'short' ? 'short (1-2 sentences, max 150 characters)' :
+                                instagramLength === 'long' ? 'long (detailed, max 2200 characters)' :
+                                'medium length (3-5 sentences, 200-500 characters)'
+    
+    const instagramHashtagsDesc = instagramHashtags ? 'Include 5-8 relevant hashtags at the end' : 'NO hashtags'
+    
+    // Build Facebook prompt based on options
+    const facebookToneDesc = facebookTone === 'casual' ? 'casual, friendly, conversational' :
+                             facebookTone === 'formal' ? 'professional, business-like' :
+                             'medium, balanced tone'
+    
+    const facebookLengthDesc = facebookLength === 'short' ? 'short (1-2 sentences)' :
+                               facebookLength === 'long' ? 'long (detailed storytelling)' :
+                               'medium length (3-4 sentences)'
+
+    // Build Email prompt based on options
+    const emailToneDesc = emailTone === 'casual' ? 'casual, friendly, informal' :
+                         emailTone === 'formal' ? 'professional, corporate' :
+                         'medium, balanced, informative'
+
+    const emailLengthDesc = emailLength === 'short' ? 'short (1-2 paragraphs)' :
+                           emailLength === 'long' ? 'long (detailed newsletter style)' :
+                           'medium length (3-4 paragraphs)'
     
     // Fetch image and convert to base64
     const response = await fetch(imageUrl)
@@ -432,14 +490,18 @@ export const generateSocialMediaCaptions = async (options: GenerateCaptionsOptio
     const base64Data = base64Image.split(',')[1]
     const imagePart = { inlineData: { data: base64Data, mimeType: blob.type } }
     
-    const prompt = `Analyze this fashion model image and create three different social media captions:
+    const prompt = `Analyze this fashion model image and create four different social media/marketing captions:
 
-1. INSTAGRAM: Create an engaging Instagram caption (max 2200 characters) with:
-   - Engaging, trendy language
-   - Relevant hashtags (5-10 hashtags)
-   - Call-to-action
-   - Emojis for visual appeal
-   - Focus on style and lifestyle
+1. INSTAGRAM: Create a natural Instagram caption with:
+   - Tone: ${instagramToneDesc}
+   - Length: ${instagramLengthDesc}
+   - ${instagramHashtagsDesc}
+   - Natural Instagram copy style - like a real person posting
+   - Minimal emojis (1-2 max, use sparingly)
+   - NO "link in bio", NO "shop now", NO promotional CTAs
+   - NO SEO keywords or marketing jargon
+   - Focus on describing the style and outfit naturally
+   - Write as if sharing a personal style moment, not selling
 
 2. WEB SHOP: Create a product description for an e-commerce website with:
    - Professional, detailed product description
@@ -450,11 +512,24 @@ export const generateSocialMediaCaptions = async (options: GenerateCaptionsOptio
    - Clear call-to-action
 
 3. FACEBOOK: Create a Facebook post caption with:
-   - Conversational, friendly tone
+   - Tone: ${facebookToneDesc}
+   - Length: ${facebookLengthDesc}
+   - Conversational, friendly approach
    - Storytelling approach
    - Engagement questions
    - Brand personality
    - Clear value proposition
+   - NO hashtags
+
+4. EMAIL: Create an email campaign with:
+   - Tone: ${emailToneDesc}
+   - Length: ${emailLengthDesc}
+   - Professional email format
+   - Compelling subject line (max 60 characters, attention-grabbing)
+   - Clear email body with proper greeting and closing
+   - Call-to-action
+   - Brand-appropriate sign-off
+   - Focus on the fashion product/collection
 
 ${clothingDescription ? `Clothing details: ${clothingDescription}` : ''}
 ${sceneDescription ? `Scene/Setting: ${sceneDescription}` : ''}
@@ -463,7 +538,9 @@ Return the response in this exact JSON format:
 {
   "instagram": "caption text here",
   "webshop": "description text here",
-  "facebook": "caption text here"
+  "facebook": "caption text here",
+  "email": "email body text here",
+  "emailSubject": "email subject line here"
 }`
 
     const textPart = { text: prompt }
@@ -485,18 +562,25 @@ Return the response in this exact JSON format:
       return {
         instagram: parsed.instagram || '',
         webshop: parsed.webshop || '',
-        facebook: parsed.facebook || ''
+        facebook: parsed.facebook || '',
+        email: parsed.email || '',
+        emailSubject: parsed.emailSubject || ''
       }
     } catch (parseError) {
+      console.error('JSON parsing failed, falling back to regex:', parseError)
       // Fallback: split by sections if JSON parsing fails
-      const instagramMatch = textResponse.match(/INSTAGRAM[:\-]?\s*(.+?)(?=WEB SHOP|FACEBOOK|$)/is)
-      const webshopMatch = textResponse.match(/WEB SHOP[:\-]?\s*(.+?)(?=FACEBOOK|$)/is)
-      const facebookMatch = textResponse.match(/FACEBOOK[:\-]?\s*(.+?)$/is)
+      const instagramMatch = textResponse.match(/INSTAGRAM[:\-]?\s*(.+?)(?=WEB SHOP|FACEBOOK|EMAIL|$)/is)
+      const webshopMatch = textResponse.match(/WEB SHOP[:\-]?\s*(.+?)(?=FACEBOOK|EMAIL|$)/is)
+      const facebookMatch = textResponse.match(/FACEBOOK[:\-]?\s*(.+?)(?=EMAIL|$)/is)
+      const emailMatch = textResponse.match(/EMAIL[:\-]?\s*(.+?)(?=EMAIL SUBJECT|$)/is)
+      const emailSubjectMatch = textResponse.match(/EMAIL SUBJECT[:\-]?\s*(.+?)$/is)
       
       return {
         instagram: instagramMatch ? instagramMatch[1].trim() : 'Check out this stunning look! ✨',
         webshop: webshopMatch ? webshopMatch[1].trim() : 'Premium quality fashion piece.',
-        facebook: facebookMatch ? facebookMatch[1].trim() : 'Introducing our latest collection!'
+        facebook: facebookMatch ? facebookMatch[1].trim() : 'Introducing our latest collection!',
+        email: emailMatch ? emailMatch[1].trim() : 'Hello, check out our new collection!',
+        emailSubject: emailSubjectMatch ? emailSubjectMatch[1].trim() : 'New Fashion Collection Alert!'
       }
     }
     
@@ -506,8 +590,79 @@ Return the response in this exact JSON format:
     return {
       instagram: '✨ New arrival! Check out this stunning look. #Fashion #Style',
       webshop: 'Premium quality fashion piece. Available now.',
-      facebook: 'Introducing our latest collection!'
+      facebook: 'Introducing our latest collection!',
+      email: 'Hello, check out our new collection!',
+      emailSubject: 'New Fashion Collection Alert!'
     }
+  }
+}
+
+interface ExpandTextOptions {
+  selectedText: string
+  platform: 'instagram' | 'facebook' | 'email' | 'webshop'
+  context?: string
+  instagramOptions?: {
+    tone?: 'casual' | 'medium' | 'formal'
+    length?: 'short' | 'medium' | 'long'
+    hashtags?: boolean
+  }
+  facebookOptions?: {
+    tone?: 'casual' | 'medium' | 'formal'
+    length?: 'short' | 'medium' | 'long'
+  }
+  emailOptions?: {
+    tone?: 'casual' | 'medium' | 'formal'
+    length?: 'short' | 'medium' | 'long'
+  }
+}
+
+export const expandTextWithAI = async (options: ExpandTextOptions): Promise<string> => {
+  try {
+    const { selectedText, platform, context, instagramOptions, facebookOptions, emailOptions } = options
+    
+    // Build platform-specific instructions
+    let platformInstruction = ''
+    if (platform === 'instagram') {
+      const tone = instagramOptions?.tone || 'medium'
+      const length = instagramOptions?.length || 'medium'
+      const hashtags = instagramOptions?.hashtags ?? true
+      
+      platformInstruction = `Continue and expand this Instagram caption. Tone: ${tone === 'casual' ? 'casual, relaxed' : tone === 'formal' ? 'professional, polished' : 'medium, conversational'}. Length: ${length === 'short' ? 'short (1-2 sentences)' : length === 'long' ? 'long (detailed)' : 'medium (3-5 sentences)'}. ${hashtags ? 'Include 5-8 relevant hashtags at the end.' : 'NO hashtags.'} Natural Instagram style, minimal emojis, NO promotional CTAs.`
+    } else if (platform === 'facebook') {
+      const tone = facebookOptions?.tone || 'casual'
+      const length = facebookOptions?.length || 'medium'
+      
+      platformInstruction = `Continue and expand this Facebook post. Tone: ${tone === 'casual' ? 'casual, friendly' : tone === 'formal' ? 'professional' : 'medium, balanced'}. Length: ${length === 'short' ? 'short (1-2 sentences)' : length === 'long' ? 'long (detailed storytelling)' : 'medium (3-4 sentences)'}. Conversational, engaging, NO hashtags.`
+    } else if (platform === 'email') {
+      const tone = emailOptions?.tone || 'medium'
+      const length = emailOptions?.length || 'medium'
+      
+      platformInstruction = `Continue and expand this email content. Tone: ${tone === 'casual' ? 'casual, friendly' : tone === 'formal' ? 'professional, corporate' : 'medium, informative'}. Length: ${length === 'short' ? 'short (1-2 paragraphs)' : length === 'long' ? 'long (detailed newsletter style)' : 'medium (3-4 paragraphs)'}. Professional email format with clear call-to-action.`
+    } else {
+      platformInstruction = `Continue and expand this product description. Professional, detailed, SEO-friendly.`
+    }
+    
+    const prompt = `The user has started writing ${platform === 'instagram' ? 'an Instagram caption' : platform === 'facebook' ? 'a Facebook post' : platform === 'email' ? 'an email' : 'a product description'} and selected this text:
+
+"${selectedText}"
+
+${platformInstruction}
+
+${context ? `Additional context: ${context}` : ''}
+
+Continue from where the user left off. Keep the same style and tone as the selected text. Complete the thought naturally and expand it according to the platform requirements. Return ONLY the continuation text (do not repeat the selected text, just continue from it).`
+
+    const response_ai = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { parts: [{ text: prompt }] },
+    })
+    
+    const textResponse = response_ai.candidates?.[0]?.content?.parts.find((part: any) => part.text)?.text || ''
+    
+    return textResponse.trim()
+  } catch (error: any) {
+    console.error('Error expanding text:', error)
+    throw new Error('Failed to expand text. Please try again.')
   }
 }
 
@@ -709,7 +864,10 @@ export const editFashionImage = async (options: EditImageOptions): Promise<strin
     
     if (imageResultPart?.inlineData) {
       // Deduct tokens
-      await tokens.deductTokens(userId, TOKEN_COSTS.editModel, 'Edited fashion image')
+      const { success } = await tokens.deductTokens(userId, TOKEN_COSTS.editModel, 'Edited fashion image')
+      if (success) {
+        notifyTokenUpdate() // Notify UI to refresh token display
+      }
       return `data:image/png;base64,${imageResultPart.inlineData.data}`
     }
     
@@ -797,7 +955,10 @@ export const generateFashionVideo = async (options: GenerateVideoOptions): Promi
             const videoUri = operation.result.videos[0].uri
             
             // Deduct tokens
-            await tokens.deductTokens(userId, VIDEO_COST, 'Generated fashion video')
+            const { success } = await tokens.deductTokens(userId, VIDEO_COST, 'Generated fashion video')
+            if (success) {
+              notifyTokenUpdate() // Notify UI to refresh token display
+            }
             
             // The URI might be temporary, usually we'd download it here. 
             // For now returning the URI or if it requires auth, we might need to proxy or fetch it.
