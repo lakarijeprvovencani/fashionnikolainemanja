@@ -13,6 +13,8 @@ import EditImageView from './EditImageView'
 import GenerateVideoView from './GenerateVideoView'
 import CreateCaptionsView from './CreateCaptionsView'
 import MarketingView from './MarketingView'
+import ContentCalendarView from './ContentCalendarView'
+import AnalyticsDashboardView from './AnalyticsDashboardView'
 
 interface FashionModel {
   id: string
@@ -30,7 +32,7 @@ const Dashboard: React.FC = () => {
   const [modelsCount, setModelsCount] = useState(0)
   const [dressedModelsCount, setDressedModelsCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'create-model-upload' | 'create-model-ai' | 'dress-model' | 'view-models' | 'gallery' | 'subscription' | 'pricing' | 'edit-image' | 'generate-video' | 'create-captions' | 'marketing' | 'create-instagram-ad' | 'create-facebook-ad'>('dashboard')
+  const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'create-model-upload' | 'create-model-ai' | 'dress-model' | 'view-models' | 'gallery' | 'subscription' | 'pricing' | 'edit-image' | 'generate-video' | 'create-captions' | 'marketing' | 'create-instagram-ad' | 'create-facebook-ad' | 'content-calendar' | 'analytics'>('dashboard')
   const [selectedModelForDressing, setSelectedModelForDressing] = useState<FashionModel | null>(null)
   const [showCreateMenu, setShowCreateMenu] = useState(false)
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null)
@@ -161,8 +163,15 @@ const Dashboard: React.FC = () => {
         return saved
       })()}
       onBack={() => {
-        // Don't clear anything, just go back
-        setCurrentView('dress-model')
+        // Check where we came from and go back accordingly
+        const previousView = localStorage.getItem('video_previousView') || 'dress-model'
+        localStorage.removeItem('video_previousView')
+        
+        if (previousView === 'marketing') {
+          setCurrentView('marketing')
+        } else {
+          setCurrentView('dress-model')
+        }
       }}
       onNavigate={(view) => setCurrentView(view as any)}
     />
@@ -179,8 +188,15 @@ const Dashboard: React.FC = () => {
         return saved || ''
       })()}
       onBack={() => {
-        // Don't clear anything, just go back
-        setCurrentView('dress-model')
+        // Check where we came from and go back accordingly
+        const previousView = localStorage.getItem('captions_previousView') || 'dress-model'
+        localStorage.removeItem('captions_previousView')
+        
+        if (previousView === 'marketing') {
+          setCurrentView('marketing')
+        } else {
+          setCurrentView('dress-model')
+        }
       }}
       onNavigate={(view) => setCurrentView(view as any)}
     />
@@ -190,6 +206,24 @@ const Dashboard: React.FC = () => {
     return (
       <MarketingView 
         adType={currentView === 'create-instagram-ad' ? 'instagram' : currentView === 'create-facebook-ad' ? 'facebook' : null}
+        onBack={() => setCurrentView('dashboard')}
+        onNavigate={(view) => setCurrentView(view as any)}
+      />
+    )
+  }
+
+  if (currentView === 'content-calendar') {
+    return (
+      <ContentCalendarView 
+        onBack={() => setCurrentView('dashboard')}
+        onNavigate={(view) => setCurrentView(view as any)}
+      />
+    )
+  }
+
+  if (currentView === 'analytics') {
+    return (
+      <AnalyticsDashboardView 
         onBack={() => setCurrentView('dashboard')}
         onNavigate={(view) => setCurrentView(view as any)}
       />
@@ -883,25 +917,101 @@ const Dashboard: React.FC = () => {
                 gap: '12px',
                 marginTop: '35px',
                 paddingTop: '30px',
-                borderTop: '1px solid #fee2e2'
+                borderTop: '1px solid #fee2e2',
+                flexWrap: 'wrap'
               }}>
-                <div style={{
-                  padding: '14px 28px',
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: '#fff',
-                  fontSize: '15px',
-                  fontWeight: '700',
-                  borderRadius: '12px',
-                  boxShadow: '0 6px 20px rgba(239, 68, 68, 0.3)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  transition: 'all 0.3s'
-                }}>
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setCurrentView('marketing')
+                  }}
+                  style={{
+                    padding: '14px 28px',
+                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    color: '#fff',
+                    fontSize: '15px',
+                    fontWeight: '700',
+                    borderRadius: '12px',
+                    boxShadow: '0 6px 20px rgba(239, 68, 68, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    transition: 'all 0.3s',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(239, 68, 68, 0.4)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.3)'
+                  }}
+                >
                   <span>Create Ad</span>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <path d="M5 12h14M12 5l7 7-7 7"/>
                   </svg>
+                </div>
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setCurrentView('content-calendar')
+                  }}
+                  style={{
+                    padding: '14px 28px',
+                    background: '#fff',
+                    color: '#ef4444',
+                    border: '2px solid #ef4444',
+                    fontSize: '15px',
+                    fontWeight: '700',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    transition: 'all 0.3s',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#fee2e2'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#fff'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }}
+                >
+                  <span>📅 Content Calendar</span>
+                </div>
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setCurrentView('analytics')
+                  }}
+                  style={{
+                    padding: '14px 28px',
+                    background: '#fff',
+                    color: '#ef4444',
+                    border: '2px solid #ef4444',
+                    fontSize: '15px',
+                    fontWeight: '700',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    transition: 'all 0.3s',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#fee2e2'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#fff'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }}
+                >
+                  <span>📊 Analytics</span>
                 </div>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import PageHeader from './PageHeader'
 import { GoogleGenAI, Modality } from '@google/genai'
@@ -20,6 +20,81 @@ const MarketingView: React.FC<MarketingViewProps> = ({ adType, onBack, onNavigat
   const [error, setError] = useState('')
   const [generatingExample, setGeneratingExample] = useState(false)
   const [expandingText, setExpandingText] = useState(false)
+
+  // Load saved data from localStorage on mount
+  useEffect(() => {
+    const savedGeneratedAd = localStorage.getItem('marketing_generatedAd')
+    // Also check dressModel_generatedImage in case it was updated in EditImageView
+    const savedDressModelImage = localStorage.getItem('dressModel_generatedImage')
+    const savedUploadedImage = localStorage.getItem('marketing_uploadedImage')
+    const savedPrompt = localStorage.getItem('marketing_prompt')
+    const savedAdType = localStorage.getItem('marketing_adType') as 'instagram' | 'facebook' | null
+
+    // Prefer dressModel_generatedImage if it exists (might be updated from EditImageView)
+    const imageToUse = savedDressModelImage || savedGeneratedAd
+    if (imageToUse) {
+      setGeneratedAd(imageToUse)
+      // Also update marketing_generatedAd to keep it in sync
+      localStorage.setItem('marketing_generatedAd', imageToUse)
+    }
+    if (savedUploadedImage) {
+      setUploadedImage(savedUploadedImage)
+    }
+    if (savedPrompt) {
+      setPrompt(savedPrompt)
+    }
+    if (savedAdType && !selectedAdType) {
+      setSelectedAdType(savedAdType)
+    }
+  }, [])
+
+  // Also listen for changes to dressModel_generatedImage (when returning from EditImageView)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const updatedImage = localStorage.getItem('dressModel_generatedImage')
+      if (updatedImage && updatedImage !== generatedAd) {
+        setGeneratedAd(updatedImage)
+        localStorage.setItem('marketing_generatedAd', updatedImage)
+      }
+    }
+
+    // Check on focus (when returning to tab)
+    window.addEventListener('focus', handleStorageChange)
+    
+    // Also check periodically (in case localStorage was updated in another tab/window)
+    const interval = setInterval(handleStorageChange, 1000)
+
+    return () => {
+      window.removeEventListener('focus', handleStorageChange)
+      clearInterval(interval)
+    }
+  }, [generatedAd])
+
+  // Save generatedAd to localStorage whenever it changes
+  useEffect(() => {
+    if (generatedAd) {
+      localStorage.setItem('marketing_generatedAd', generatedAd)
+    }
+  }, [generatedAd])
+
+  // Save other data to localStorage
+  useEffect(() => {
+    if (uploadedImage) {
+      localStorage.setItem('marketing_uploadedImage', uploadedImage)
+    }
+  }, [uploadedImage])
+
+  useEffect(() => {
+    if (prompt) {
+      localStorage.setItem('marketing_prompt', prompt)
+    }
+  }, [prompt])
+
+  useEffect(() => {
+    if (selectedAdType) {
+      localStorage.setItem('marketing_adType', selectedAdType)
+    }
+  }, [selectedAdType])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -338,6 +413,8 @@ Generate a professional, eye-catching ad image.`
         title={`Create ${selectedAdType === 'instagram' ? 'Instagram' : 'Facebook'} Ad`}
         onBack={() => {
           if (selectedAdType) {
+            // Don't clear localStorage - keep data saved for when user comes back
+            // Just reset UI state
             setSelectedAdType(null)
             setUploadedImage(null)
             setImageFile(null)
@@ -594,7 +671,8 @@ Generate a professional, eye-catching ad image.`
             flexDirection: 'column',
             alignItems: 'center', 
             justifyContent: 'center', 
-            minHeight: '600px',
+            maxHeight: 'calc(100vh - 120px)',
+            minHeight: '650px',
             position: 'relative', 
             border: '1px solid #f0f0f0',
             overflow: 'hidden'
@@ -617,101 +695,255 @@ Generate a professional, eye-catching ad image.`
               <div style={{ 
                 width: '100%', 
                 height: '100%', 
-                padding: '40px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'auto'
+                display: 'flex', 
+                flexDirection: 'column',
+                overflow: 'hidden'
               }}>
-                <div style={{
-                  background: '#fff',
-                  borderRadius: '12px',
-                  padding: '20px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                  maxWidth: '100%',
-                  width: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center'
+                <div style={{ 
+                  flex: 1, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  padding: '10px',
+                  minHeight: 0,
+                  maxHeight: 'calc(100vh - 300px)',
+                  overflow: 'auto'
                 }}>
-                  <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1a202c', marginBottom: '20px' }}>
-                    Generated Ad Image
-                  </h3>
                   <img 
                     src={generatedAd} 
                     alt="Generated ad" 
-                    style={{
-                      maxWidth: '100%',
+                    style={{ 
+                      maxHeight: '100%',
+                      maxWidth: '600px',
                       height: 'auto',
-                      borderRadius: '8px',
-                      boxShadow: '0 2px 12px rgba(0,0,0,0.1)',
-                      marginBottom: '20px'
-                    }}
+                      width: 'auto',
+                      borderRadius: '6px', 
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
+                      objectFit: 'contain',
+                      display: 'block'
+                    }} 
                   />
-                  <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>
-                    <button
-                      onClick={() => {
-                        // Save generated ad to localStorage so EditImageView can access it
-                        if (generatedAd) {
-                          localStorage.setItem('dressModel_generatedImage', generatedAd)
-                        }
-                        // Save that we're coming from marketing view
-                        localStorage.setItem('editImage_previousView', 'marketing')
-                        // Navigate to edit-image view
-                        onNavigate('edit-image')
-                      }}
-                      style={{
-                        padding: '10px 20px',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)'
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)'
-                        e.currentTarget.style.boxShadow = 'none'
-                      }}
-                    >
-                      ✏️ Edit
-                    </button>
-                    <a
-                      href={generatedAd}
-                      download={`${selectedAdType}-ad-${Date.now()}.png`}
-                      style={{
-                        padding: '10px 20px',
-                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        textDecoration: 'none',
-                        display: 'inline-block',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)'
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.4)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)'
-                        e.currentTarget.style.boxShadow = 'none'
-                      }}
-                    >
-                      ⬇️ Download Ad
-                    </a>
+                </div>
+                  {/* Action Buttons - Modern Grid Layout */}
+                  <div style={{ 
+                    padding: '28px 32px', 
+                    background: '#fafafa', 
+                    borderTop: '1px solid #e5e7eb', 
+                    flexShrink: 0,
+                    width: '100%'
+                  }}>
+                    {/* Top Row - Primary Actions */}
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '1fr 1fr', 
+                      gap: '14px',
+                      marginBottom: '14px'
+                    }}>
+                      <button
+                        onClick={() => {
+                          // Save generated ad to localStorage so EditImageView can access it
+                          if (generatedAd) {
+                            localStorage.setItem('dressModel_generatedImage', generatedAd)
+                          }
+                          // Save that we're coming from marketing view
+                          localStorage.setItem('editImage_previousView', 'marketing')
+                          // Navigate to edit-image view
+                          onNavigate('edit-image')
+                        }}
+                        style={{
+                          padding: '18px 20px',
+                          background: '#ffffff',
+                          color: '#1f2937',
+                          border: '2px solid #e5e7eb',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          borderRadius: '12px',
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '10px',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#fef3c7'
+                          e.currentTarget.style.borderColor = '#f59e0b'
+                          e.currentTarget.style.transform = 'translateY(-2px)'
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.2)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#ffffff'
+                          e.currentTarget.style.borderColor = '#e5e7eb'
+                          e.currentTarget.style.transform = 'translateY(0)'
+                          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)'
+                        }}
+                      >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        <span>Edit Image</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Save generated ad to localStorage so GenerateVideoView can access it
+                          if (generatedAd) {
+                            localStorage.setItem('dressModel_generatedImage', generatedAd)
+                          }
+                          // Save that we're coming from marketing view
+                          localStorage.setItem('video_previousView', 'marketing')
+                          // Navigate to generate-video view
+                          onNavigate('generate-video')
+                        }}
+                        style={{
+                          padding: '18px 20px',
+                          background: '#ffffff',
+                          color: '#1f2937',
+                          border: '2px solid #e5e7eb',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          borderRadius: '12px',
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '10px',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#dbeafe'
+                          e.currentTarget.style.borderColor = '#3b82f6'
+                          e.currentTarget.style.transform = 'translateY(-2px)'
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.2)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#ffffff'
+                          e.currentTarget.style.borderColor = '#e5e7eb'
+                          e.currentTarget.style.transform = 'translateY(0)'
+                          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)'
+                        }}
+                      >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        <span>Generate Video</span>
+                      </button>
+                    </div>
+
+                    {/* Second Row - Secondary Actions */}
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: '1fr 1fr', 
+                      gap: '14px',
+                      marginBottom: '14px'
+                    }}>
+                      <button
+                        onClick={() => {
+                          // Navigate to create-captions view
+                          if (generatedAd) {
+                            localStorage.setItem('dressModel_generatedImage', generatedAd)
+                          }
+                          // Save prompt as scenePrompt for CreateCaptionsView
+                          if (prompt) {
+                            localStorage.setItem('dressModel_scenePrompt', prompt)
+                          }
+                          // Save that we're coming from marketing view
+                          localStorage.setItem('captions_previousView', 'marketing')
+                          onNavigate('create-captions')
+                        }}
+                        style={{
+                          padding: '18px 20px',
+                          background: '#ffffff',
+                          color: '#1f2937',
+                          border: '2px solid #e5e7eb',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          borderRadius: '12px',
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '10px',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#f3e8ff'
+                          e.currentTarget.style.borderColor = '#a855f7'
+                          e.currentTarget.style.transform = 'translateY(-2px)'
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(168, 85, 247, 0.2)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#ffffff'
+                          e.currentTarget.style.borderColor = '#e5e7eb'
+                          e.currentTarget.style.transform = 'translateY(0)'
+                          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)'
+                        }}
+                      >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span>Captions</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!generatedAd) return
+                          const link = document.createElement('a')
+                          link.href = generatedAd
+                          link.download = `${selectedAdType}-ad-${Date.now()}.png`
+                          document.body.appendChild(link)
+                          link.click()
+                          document.body.removeChild(link)
+                        }}
+                        disabled={!generatedAd}
+                        style={{
+                          padding: '18px 20px',
+                          background: !generatedAd ? '#e5e7eb' : '#1f2937',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: !generatedAd ? 'default' : 'pointer',
+                          borderRadius: '12px',
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: !generatedAd ? 'none' : '0 4px 14px rgba(31, 41, 55, 0.3)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '10px',
+                          opacity: !generatedAd ? 0.5 : 1
+                        }}
+                        onMouseEnter={(e) => {
+                          if (generatedAd) {
+                            e.currentTarget.style.background = '#111827'
+                            e.currentTarget.style.transform = 'translateY(-2px)'
+                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(31, 41, 55, 0.4)'
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (generatedAd) {
+                            e.currentTarget.style.background = '#1f2937'
+                            e.currentTarget.style.transform = 'translateY(0)'
+                            e.currentTarget.style.boxShadow = '0 4px 14px rgba(31, 41, 55, 0.3)'
+                          }
+                        }}
+                      >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                          <polyline points="7 10 12 15 17 10"></polyline>
+                          <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>Download</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
             ) : (
               <div style={{ textAlign: 'center', opacity: 0.2, padding: '40px' }}>
                 <div style={{ fontSize: '64px', marginBottom: '20px' }}>📱</div>
