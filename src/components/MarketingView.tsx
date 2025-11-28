@@ -21,80 +21,50 @@ const MarketingView: React.FC<MarketingViewProps> = ({ adType, onBack, onNavigat
   const [generatingExample, setGeneratingExample] = useState(false)
   const [expandingText, setExpandingText] = useState(false)
 
-  // Load saved data from localStorage on mount
+  // Load saved data from localStorage on mount - separate for Instagram and Facebook
   useEffect(() => {
-    const savedGeneratedAd = localStorage.getItem('marketing_generatedAd')
-    // Also check dressModel_generatedImage in case it was updated in EditImageView
-    const savedDressModelImage = localStorage.getItem('dressModel_generatedImage')
-    const savedUploadedImage = localStorage.getItem('marketing_uploadedImage')
-    const savedPrompt = localStorage.getItem('marketing_prompt')
-    const savedAdType = localStorage.getItem('marketing_adType') as 'instagram' | 'facebook' | null
+    // Determine which ad type we're working with
+    const adTypeToLoad = selectedAdType || adType
+    
+    if (adTypeToLoad) {
+      const prefix = adTypeToLoad === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+      const savedGeneratedAd = localStorage.getItem(`${prefix}_generated`)
+      const savedUploadedImage = localStorage.getItem(`${prefix}_uploadedImage`)
+      const savedPrompt = localStorage.getItem(`${prefix}_prompt`)
 
-    // Prefer dressModel_generatedImage if it exists (might be updated from EditImageView)
-    const imageToUse = savedDressModelImage || savedGeneratedAd
-    if (imageToUse) {
-      setGeneratedAd(imageToUse)
-      // Also update marketing_generatedAd to keep it in sync
-      localStorage.setItem('marketing_generatedAd', imageToUse)
-    }
-    if (savedUploadedImage) {
-      setUploadedImage(savedUploadedImage)
-    }
-    if (savedPrompt) {
-      setPrompt(savedPrompt)
-    }
-    if (savedAdType && !selectedAdType) {
-      setSelectedAdType(savedAdType)
-    }
-  }, [])
-
-  // Also listen for changes to dressModel_generatedImage (when returning from EditImageView)
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const updatedImage = localStorage.getItem('dressModel_generatedImage')
-      if (updatedImage && updatedImage !== generatedAd) {
-        setGeneratedAd(updatedImage)
-        localStorage.setItem('marketing_generatedAd', updatedImage)
+      if (savedGeneratedAd) {
+        setGeneratedAd(savedGeneratedAd)
+      }
+      if (savedUploadedImage) {
+        setUploadedImage(savedUploadedImage)
+      }
+      if (savedPrompt) {
+        setPrompt(savedPrompt)
       }
     }
-
-    // Check on focus (when returning to tab)
-    window.addEventListener('focus', handleStorageChange)
-    
-    // Also check periodically (in case localStorage was updated in another tab/window)
-    const interval = setInterval(handleStorageChange, 1000)
-
-    return () => {
-      window.removeEventListener('focus', handleStorageChange)
-      clearInterval(interval)
-    }
-  }, [generatedAd])
-
-  // Save generatedAd to localStorage whenever it changes
-  useEffect(() => {
-    if (generatedAd) {
-      localStorage.setItem('marketing_generatedAd', generatedAd)
-    }
-  }, [generatedAd])
-
-  // Save other data to localStorage
-  useEffect(() => {
-    if (uploadedImage) {
-      localStorage.setItem('marketing_uploadedImage', uploadedImage)
-    }
-  }, [uploadedImage])
-
-  useEffect(() => {
-    if (prompt) {
-      localStorage.setItem('marketing_prompt', prompt)
-    }
-  }, [prompt])
-
-  useEffect(() => {
-    if (selectedAdType) {
-      localStorage.setItem('marketing_adType', selectedAdType)
-    }
   }, [selectedAdType])
+
+  // Save data to localStorage whenever it changes - separate for Instagram and Facebook
+  useEffect(() => {
+    if (selectedAdType && generatedAd) {
+      const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+      localStorage.setItem(`${prefix}_generated`, generatedAd)
+    }
+  }, [generatedAd, selectedAdType])
+
+  useEffect(() => {
+    if (selectedAdType && uploadedImage) {
+      const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+      localStorage.setItem(`${prefix}_uploadedImage`, uploadedImage)
+    }
+  }, [uploadedImage, selectedAdType])
+
+  useEffect(() => {
+    if (selectedAdType && prompt) {
+      const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+      localStorage.setItem(`${prefix}_prompt`, prompt)
+    }
+  }, [prompt, selectedAdType])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -741,12 +711,14 @@ Generate a professional, eye-catching ad image.`
                     }}>
                       <button
                         onClick={() => {
-                          // Save generated ad to localStorage so EditImageView can access it
-                          if (generatedAd) {
-                            localStorage.setItem('dressModel_generatedImage', generatedAd)
+                          // Save generated ad with ad-type specific key
+                          if (generatedAd && selectedAdType) {
+                            const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+                            localStorage.setItem(`${prefix}_editImage`, generatedAd)
                           }
-                          // Save that we're coming from marketing view
+                          // Save that we're coming from marketing view and which ad type
                           localStorage.setItem('editImage_previousView', 'marketing')
+                          localStorage.setItem('editImage_adType', selectedAdType || 'instagram')
                           // Navigate to edit-image view
                           onNavigate('edit-image')
                         }}
@@ -788,12 +760,14 @@ Generate a professional, eye-catching ad image.`
                       </button>
                       <button
                         onClick={() => {
-                          // Save generated ad to localStorage so GenerateVideoView can access it
-                          if (generatedAd) {
-                            localStorage.setItem('dressModel_generatedImage', generatedAd)
+                          // Save generated ad with ad-type specific key
+                          if (generatedAd && selectedAdType) {
+                            const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+                            localStorage.setItem(`${prefix}_videoImage`, generatedAd)
                           }
-                          // Save that we're coming from marketing view
+                          // Save that we're coming from marketing view and which ad type
                           localStorage.setItem('video_previousView', 'marketing')
+                          localStorage.setItem('video_adType', selectedAdType || 'instagram')
                           // Navigate to generate-video view
                           onNavigate('generate-video')
                         }}
@@ -843,16 +817,19 @@ Generate a professional, eye-catching ad image.`
                     }}>
                       <button
                         onClick={() => {
-                          // Navigate to create-captions view
-                          if (generatedAd) {
-                            localStorage.setItem('dressModel_generatedImage', generatedAd)
+                          // Save generated ad with ad-type specific key
+                          if (generatedAd && selectedAdType) {
+                            const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+                            localStorage.setItem(`${prefix}_captionsImage`, generatedAd)
                           }
                           // Save prompt as scenePrompt for CreateCaptionsView
-                          if (prompt) {
-                            localStorage.setItem('dressModel_scenePrompt', prompt)
+                          if (prompt && selectedAdType) {
+                            const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+                            localStorage.setItem(`${prefix}_captionsPrompt`, prompt)
                           }
-                          // Save that we're coming from marketing view
+                          // Save that we're coming from marketing view and which ad type
                           localStorage.setItem('captions_previousView', 'marketing')
+                          localStorage.setItem('captions_adType', selectedAdType || 'instagram')
                           onNavigate('create-captions')
                         }}
                         style={{
@@ -942,6 +919,60 @@ Generate a professional, eye-catching ad image.`
                         <span>Download</span>
                       </button>
                     </div>
+
+                    {/* Reset Button - Full Width Below */}
+                    <button
+                      onClick={() => {
+                        setGeneratedAd(null)
+                        setUploadedImage(null)
+                        setImageFile(null)
+                        setPrompt('')
+                        // Clear only the current ad type's localStorage
+                        if (selectedAdType) {
+                          const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+                          localStorage.removeItem(`${prefix}_generated`)
+                          localStorage.removeItem(`${prefix}_uploadedImage`)
+                          localStorage.removeItem(`${prefix}_prompt`)
+                          localStorage.removeItem(`${prefix}_editImage`)
+                          localStorage.removeItem(`${prefix}_videoImage`)
+                          localStorage.removeItem(`${prefix}_captionsImage`)
+                          localStorage.removeItem(`${prefix}_captionsPrompt`)
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        marginTop: '8px',
+                        padding: '14px',
+                        background: 'transparent',
+                        color: '#6b7280',
+                        border: '1px solid #e5e7eb',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        borderRadius: '10px',
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#fee2e2'
+                        e.currentTarget.style.borderColor = '#ef4444'
+                        e.currentTarget.style.color = '#dc2626'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent'
+                        e.currentTarget.style.borderColor = '#e5e7eb'
+                        e.currentTarget.style.color = '#6b7280'
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="1 4 1 10 7 10"></polyline>
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                      </svg>
+                      <span>Reset & Start Over</span>
+                    </button>
                   </div>
                 </div>
             ) : (

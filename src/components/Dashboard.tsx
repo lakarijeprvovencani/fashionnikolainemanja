@@ -131,9 +131,19 @@ const Dashboard: React.FC = () => {
   }
 
   if (currentView === 'edit-image') {
+    // Check where we came from to load the correct image
+    const previousView = localStorage.getItem('editImage_previousView') || 'dress-model'
+    const adType = localStorage.getItem('editImage_adType') as 'instagram' | 'facebook' | null
+    
+    let imageKey = 'dressModel_generatedImage'
+    if (previousView === 'marketing' && adType) {
+      const prefix = adType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+      imageKey = `${prefix}_editImage`
+    }
+    
     return <EditImageView 
       imageUrl={currentGeneratedImage || (() => {
-        const saved = localStorage.getItem('dressModel_generatedImage')
+        const saved = localStorage.getItem(imageKey)
         return saved
       })()}
       onBack={() => {
@@ -141,10 +151,21 @@ const Dashboard: React.FC = () => {
         const savedPreviousView = localStorage.getItem('editImage_previousView') || 'dress-model'
         setCurrentView(savedPreviousView as any)
         localStorage.removeItem('editImage_previousView')
+        localStorage.removeItem('editImage_adType')
       }}
       onImageUpdated={(newImageUrl) => {
         setCurrentGeneratedImage(newImageUrl)
-        localStorage.setItem('dressModel_generatedImage', newImageUrl)
+        // Save to the correct localStorage key based on where we came from
+        const savedPreviousView = localStorage.getItem('editImage_previousView') || 'dress-model'
+        const savedAdType = localStorage.getItem('editImage_adType') as 'instagram' | 'facebook' | null
+        
+        if (savedPreviousView === 'marketing' && savedAdType) {
+          const prefix = savedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+          localStorage.setItem(`${prefix}_generated`, newImageUrl)
+          localStorage.setItem(`${prefix}_editImage`, newImageUrl)
+        } else {
+          localStorage.setItem('dressModel_generatedImage', newImageUrl)
+        }
       }}
       onNavigate={(view) => {
         // Save current view before navigating to edit-image
@@ -157,15 +178,26 @@ const Dashboard: React.FC = () => {
   }
 
   if (currentView === 'generate-video') {
+    // Check where we came from to load the correct image
+    const previousView = localStorage.getItem('video_previousView') || 'dress-model'
+    const adType = localStorage.getItem('video_adType') as 'instagram' | 'facebook' | null
+    
+    let imageKey = 'dressModel_generatedImage'
+    if (previousView === 'marketing' && adType) {
+      const prefix = adType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+      imageKey = `${prefix}_videoImage`
+    }
+    
     return <GenerateVideoView 
       imageUrl={currentGeneratedImage || (() => {
-        const saved = localStorage.getItem('dressModel_generatedImage')
+        const saved = localStorage.getItem(imageKey)
         return saved
       })()}
       onBack={() => {
         // Check where we came from and go back accordingly
         const previousView = localStorage.getItem('video_previousView') || 'dress-model'
         localStorage.removeItem('video_previousView')
+        localStorage.removeItem('video_adType')
         
         if (previousView === 'marketing') {
           setCurrentView('marketing')
@@ -178,19 +210,33 @@ const Dashboard: React.FC = () => {
   }
 
   if (currentView === 'create-captions') {
+    // Check where we came from to load the correct image and prompt
+    const previousView = localStorage.getItem('captions_previousView') || 'dress-model'
+    const adType = localStorage.getItem('captions_adType') as 'instagram' | 'facebook' | null
+    
+    let imageKey = 'dressModel_generatedImage'
+    let promptKey = 'dressModel_scenePrompt'
+    
+    if (previousView === 'marketing' && adType) {
+      const prefix = adType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+      imageKey = `${prefix}_captionsImage`
+      promptKey = `${prefix}_captionsPrompt`
+    }
+    
     return <CreateCaptionsView 
       imageUrl={currentGeneratedImage || (() => {
-        const saved = localStorage.getItem('dressModel_generatedImage')
+        const saved = localStorage.getItem(imageKey)
         return saved
       })()}
       scenePrompt={currentScenePrompt || (() => {
-        const saved = localStorage.getItem('dressModel_scenePrompt')
+        const saved = localStorage.getItem(promptKey)
         return saved || ''
       })()}
       onBack={() => {
         // Check where we came from and go back accordingly
         const previousView = localStorage.getItem('captions_previousView') || 'dress-model'
         localStorage.removeItem('captions_previousView')
+        localStorage.removeItem('captions_adType')
         
         if (previousView === 'marketing') {
           setCurrentView('marketing')
