@@ -304,6 +304,38 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
           <div style={{ padding: '10px 0' }}>
             <button
               onClick={() => {
+                onNavigate('history-gallery')
+                setIsOpen(false)
+              }}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#333',
+                textAlign: 'left',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#f9f9f9'
+                e.currentTarget.style.color = '#000'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.color = '#333'
+              }}
+            >
+              My Creations
+            </button>
+
+            <button
+              onClick={() => {
                 onNavigate('subscription')
                 setIsOpen(false)
               }}

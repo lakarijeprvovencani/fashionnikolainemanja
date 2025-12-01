@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase, storage, dressedModels, userHistory, clothingLibrary } from '../lib/supabase'
+import { supabase, storage, dressedModels, userHistory, clothingLibrary, aiGeneratedContent } from '../lib/supabase'
 import { generateDressedModel, processClothingImage } from '../lib/gemini'
 import PageHeader from './PageHeader'
 
@@ -266,6 +266,29 @@ const DressModel: React.FC<DressModelProps> = ({ onBack, preselectedModel, onNav
             clothingCount: clothingImages.length
           }
         }).catch(err => console.error('Error saving activity history:', err))
+      }
+
+      // Autosave to AI generated content
+      if (user?.id && selectedModel) {
+        try {
+          await aiGeneratedContent.saveContent({
+            userId: user.id,
+            contentType: 'dressed_model',
+            title: `Dressed Model: ${selectedModel.model_name}`,
+            imageUrl: imageUrl,
+            scenePrompt: scenePrompt,
+            modelId: selectedModel.id,
+            generationSettings: {
+              clothingCount: clothingImages.length,
+              backgroundPrompt: scenePrompt
+            },
+            contentData: {
+              modelName: selectedModel.model_name
+            }
+          }).catch(err => console.error('Error autosaving dressed model:', err))
+        } catch (err) {
+          console.error('Error autosaving dressed model:', err)
+        }
       }
       
       // Auto-save to database

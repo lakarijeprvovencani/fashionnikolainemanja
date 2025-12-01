@@ -930,3 +930,389 @@ export const subscriptions = {
     return { data: data || [], error }
   }
 }
+
+// Brand Memory Map - Brand Profile functions
+export const brandProfiles = {
+  // Get all brand profiles for a user
+  async getUserBrandProfiles(userId: string) {
+    const { data, error } = await supabase
+      .from('brand_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    
+    return { data: data || [], error }
+  },
+
+  // Get active brand profile for a user
+  async getActiveBrandProfile(userId: string) {
+    const { data, error } = await supabase
+      .from('brand_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single()
+    
+    return { data, error }
+  },
+
+  // Get brand profile by ID
+  async getBrandProfile(profileId: string) {
+    const { data, error } = await supabase
+      .from('brand_profiles')
+      .select('*')
+      .eq('id', profileId)
+      .single()
+    
+    return { data, error }
+  },
+
+  // Create new brand profile
+  async createBrandProfile(userId: string, profileData: {
+    brand_name: string
+    industry?: string
+    website?: string
+    brand_voice?: string
+    tone_keywords?: string[]
+    target_audience?: any
+    product_info?: any
+    marketing_preferences?: any
+    is_active?: boolean
+  }) {
+    try {
+      // Calculate completion percentage
+      let completion = 0
+      if (profileData.brand_name) completion += 20
+      if (profileData.industry) completion += 15
+      if (profileData.brand_voice) completion += 15
+      if (profileData.target_audience && Object.keys(profileData.target_audience).length > 0) completion += 25
+      if (profileData.product_info && Object.keys(profileData.product_info).length > 0) completion += 15
+      if (profileData.marketing_preferences && Object.keys(profileData.marketing_preferences).length > 0) completion += 10
+
+      const { data, error } = await supabase
+        .from('brand_profiles')
+        .insert({
+          user_id: userId,
+          brand_name: profileData.brand_name,
+          industry: profileData.industry || null,
+          website: profileData.website || null,
+          brand_voice: profileData.brand_voice || null,
+          tone_keywords: profileData.tone_keywords || [],
+          target_audience: profileData.target_audience || {},
+          product_info: profileData.product_info || {},
+          marketing_preferences: profileData.marketing_preferences || {},
+          is_active: profileData.is_active || false,
+          completion_percentage: completion
+        })
+        .select()
+        .single()
+
+      // If this is set as active, ensure it's the only active one
+      if (profileData.is_active && data) {
+        await this.setActiveProfile(userId, data.id)
+      }
+
+      return { data, error }
+    } catch (error: any) {
+      return { data: null, error }
+    }
+  },
+
+  // Update brand profile
+  async updateBrandProfile(profileId: string, updates: {
+    brand_name?: string
+    industry?: string
+    website?: string
+    brand_voice?: string
+    tone_keywords?: string[]
+    target_audience?: any
+    product_info?: any
+    marketing_preferences?: any
+  }) {
+    try {
+      // Recalculate completion percentage
+      const { data: currentProfile } = await this.getBrandProfile(profileId)
+      if (!currentProfile) {
+        return { data: null, error: new Error('Profile not found') }
+      }
+
+      const updatedData = { ...currentProfile, ...updates }
+      let completion = 0
+      if (updatedData.brand_name) completion += 20
+      if (updatedData.industry) completion += 15
+      if (updatedData.brand_voice) completion += 15
+      if (updatedData.target_audience && Object.keys(updatedData.target_audience).length > 0) completion += 25
+      if (updatedData.product_info && Object.keys(updatedData.product_info).length > 0) completion += 15
+      if (updatedData.marketing_preferences && Object.keys(updatedData.marketing_preferences).length > 0) completion += 10
+
+      const { data, error } = await supabase
+        .from('brand_profiles')
+        .update({
+          ...updates,
+          completion_percentage: completion
+        })
+        .eq('id', profileId)
+        .select()
+        .single()
+
+      return { data, error }
+    } catch (error: any) {
+      return { data: null, error }
+    }
+  },
+
+  // Set active profile (deactivates all others for this user)
+  async setActiveProfile(userId: string, profileId: string) {
+    try {
+      // First, deactivate all profiles for this user
+      await supabase
+        .from('brand_profiles')
+        .update({ is_active: false })
+        .eq('user_id', userId)
+
+      // Then activate the selected profile
+      const { data, error } = await supabase
+        .from('brand_profiles')
+        .update({ is_active: true })
+        .eq('id', profileId)
+        .eq('user_id', userId)
+        .select()
+        .single()
+
+      return { data, error }
+    } catch (error: any) {
+      return { data: null, error }
+    }
+  },
+
+  // Delete brand profile
+  async deleteBrandProfile(profileId: string) {
+    const { data, error } = await supabase
+      .from('brand_profiles')
+      .delete()
+      .eq('id', profileId)
+      .select()
+      .single()
+
+    return { data, error }
+  },
+
+  // Get profile count for user (to check limits)
+  async getUserProfileCount(userId: string) {
+    const { count, error } = await supabase
+      .from('brand_profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+
+    return { count: count || 0, error }
+  },
+
+  // Increment usage count (when profile is used in AI generation)
+  async incrementUsageCount(profileId: string) {
+    const { data: profile } = await this.getBrandProfile(profileId)
+    if (!profile) return { data: null, error: new Error('Profile not found') }
+
+    const { data, error } = await supabase
+      .from('brand_profiles')
+      .update({ usage_count: (profile.usage_count || 0) + 1 })
+      .eq('id', profileId)
+      .select()
+      .single()
+
+    return { data, error }
+  }
+}
+
+// AI Generated Content - Autosave functionality for all AI-generated content
+export const aiGeneratedContent = {
+  // Save AI-generated content (autosave)
+  async saveContent(data: {
+    userId: string
+    contentType: 'model' | 'dressed_model' | 'caption_instagram' | 'caption_webshop' | 'caption_facebook' | 'caption_email' | 'generated_image' | 'generated_video' | 'edited_image'
+    title?: string
+    imageUrl?: string
+    videoUrl?: string
+    prompt?: string
+    scenePrompt?: string
+    modelId?: string
+    captions?: any
+    generationSettings?: any
+    contentData?: any
+    tags?: string[]
+    notes?: string
+  }) {
+    try {
+      const { data: result, error } = await supabase
+        .from('ai_generated_content')
+        .insert({
+          user_id: data.userId,
+          content_type: data.contentType,
+          title: data.title || null,
+          image_url: data.imageUrl || null,
+          video_url: data.videoUrl || null,
+          prompt: data.prompt || null,
+          scene_prompt: data.scenePrompt || null,
+          model_id: data.modelId || null,
+          captions: data.captions || null,
+          generation_settings: data.generationSettings || {},
+          content_data: data.contentData || {},
+          tags: data.tags || [],
+          notes: data.notes || null,
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
+        })
+        .select()
+        .single()
+
+      return { data: result, error }
+    } catch (error: any) {
+      console.error('Error saving AI content:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Update existing content
+  async updateContent(contentId: string, updates: {
+    title?: string
+    isFavorite?: boolean
+    tags?: string[]
+    notes?: string
+  }) {
+    try {
+      const { data, error } = await supabase
+        .from('ai_generated_content')
+        .update(updates)
+        .eq('id', contentId)
+        .select()
+        .single()
+
+      return { data, error }
+    } catch (error: any) {
+      console.error('Error updating AI content:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Get all content for user (with filters)
+  async getUserContent(userId: string, options?: {
+    contentType?: string
+    limit?: number
+    offset?: number
+    favoritesOnly?: boolean
+    tags?: string[]
+  }) {
+    try {
+      let query = supabase
+        .from('ai_generated_content')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+
+      if (options?.contentType) {
+        query = query.eq('content_type', options.contentType)
+      }
+
+      if (options?.favoritesOnly) {
+        query = query.eq('is_favorite', true)
+      }
+
+      if (options?.tags && options.tags.length > 0) {
+        query = query.contains('tags', options.tags)
+      }
+
+      if (options?.limit) {
+        query = query.limit(options.limit)
+      }
+
+      if (options?.offset) {
+        query = query.range(options.offset, options.offset + (options.limit || 50) - 1)
+      }
+
+      const { data, error } = await query
+
+      return { data: data || [], error }
+    } catch (error: any) {
+      console.error('Error fetching AI content:', error)
+      return { data: [], error }
+    }
+  },
+
+  // Get content by ID
+  async getContentById(contentId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('ai_generated_content')
+        .select('*')
+        .eq('id', contentId)
+        .single()
+
+      return { data, error }
+    } catch (error: any) {
+      console.error('Error fetching AI content by ID:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Delete content
+  async deleteContent(contentId: string) {
+    try {
+      const { error } = await supabase
+        .from('ai_generated_content')
+        .delete()
+        .eq('id', contentId)
+
+      return { error }
+    } catch (error: any) {
+      console.error('Error deleting AI content:', error)
+      return { error }
+    }
+  },
+
+  // Get content count by type
+  async getContentCount(userId: string, contentType?: string) {
+    try {
+      let query = supabase
+        .from('ai_generated_content')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+
+      if (contentType) {
+        query = query.eq('content_type', contentType)
+      }
+
+      const { count, error } = await query
+
+      return { count: count || 0, error }
+    } catch (error: any) {
+      console.error('Error counting AI content:', error)
+      return { count: 0, error }
+    }
+  },
+
+  // Get recent content (last N items)
+  async getRecentContent(userId: string, limit: number = 20) {
+    try {
+      const { data, error } = await supabase
+        .from('ai_generated_content')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+      return { data: data || [], error }
+    } catch (error: any) {
+      console.error('Error fetching recent AI content:', error)
+      return { data: [], error }
+    }
+  },
+
+  // Cleanup expired content (called by cron job or manually)
+  async cleanupExpiredContent() {
+    try {
+      const { data, error } = await supabase.rpc('cleanup_expired_ai_content')
+      return { data, error }
+    } catch (error: any) {
+      console.error('Error cleaning up expired content:', error)
+      return { data: null, error }
+    }
+  }
+}

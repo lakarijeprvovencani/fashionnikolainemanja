@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import PageHeader from './PageHeader'
+import BrandMemoryMapBanner from './BrandMemoryMapBanner'
+import { brandProfiles } from '../lib/supabase'
 import { GoogleGenAI, Modality } from '@google/genai'
 
 interface MarketingViewProps {
@@ -20,6 +22,31 @@ const MarketingView: React.FC<MarketingViewProps> = ({ adType, onBack, onNavigat
   const [error, setError] = useState('')
   const [generatingExample, setGeneratingExample] = useState(false)
   const [expandingText, setExpandingText] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+
+  // Prevent default drag behaviors on document level
+  useEffect(() => {
+    const preventDefaults = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+
+    const handleDragOver = (e: DragEvent) => {
+      preventDefaults(e)
+    }
+
+    const handleDrop = (e: DragEvent) => {
+      preventDefaults(e)
+    }
+
+    document.addEventListener('dragover', handleDragOver)
+    document.addEventListener('drop', handleDrop)
+
+    return () => {
+      document.removeEventListener('dragover', handleDragOver)
+      document.removeEventListener('drop', handleDrop)
+    }
+  }, [])
 
   // Load saved data from localStorage on mount - separate for Instagram and Facebook
   useEffect(() => {
@@ -54,8 +81,30 @@ const MarketingView: React.FC<MarketingViewProps> = ({ adType, onBack, onNavigat
 
   useEffect(() => {
     if (selectedAdType && uploadedImage) {
-      const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
-      localStorage.setItem(`${prefix}_uploadedImage`, uploadedImage)
+      try {
+        const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+        // Only save if image is valid base64 string and not too large
+        if (uploadedImage.startsWith('data:image/')) {
+          // Check size - localStorage has ~5-10MB limit
+          const sizeInBytes = new Blob([uploadedImage]).size
+          if (sizeInBytes < 4 * 1024 * 1024) { // 4MB limit for safety
+            localStorage.setItem(`${prefix}_uploadedImage`, uploadedImage)
+          } else {
+            console.warn('Image too large for localStorage, skipping save')
+          }
+        }
+      } catch (error) {
+        console.error('Error saving image to localStorage:', error)
+        // If quota exceeded, try to clear old data
+        if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+          try {
+            localStorage.removeItem(`${selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'}_uploadedImage`)
+            console.log('Cleared old image data due to quota exceeded')
+          } catch (clearError) {
+            console.error('Failed to clear localStorage:', clearError)
+          }
+        }
+      }
     }
   }, [uploadedImage, selectedAdType])
 
@@ -69,12 +118,149 @@ const MarketingView: React.FC<MarketingViewProps> = ({ adType, onBack, onNavigat
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      setImageFile(file)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setUploadedImage(reader.result as string)
+      processImageFile(file)
+    }
+  }
+
+  const processImageFile = (file: File) => {
+    // Reset dragging state first
+    setIsDragging(false)
+    
+    // Prevent multiple simultaneous processing
+    if (loading) {
+      console.log('Already processing an image, skipping...')
+      return
+    }
+    
+    try {
+      if (!file || !file.type) {
+        setError('Invalid file. Please upload an image file.')
+        return
       }
-      reader.readAsDataURL(file)
+
+      if (!file.type.startsWith('image/')) {
+        setError('Please upload an image file')
+        return
+      }
+
+      // Validate file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        setError('Image file is too large. Maximum size is 10MB.')
+        return
+      }
+      
+      setError('') // Clear any previous errors
+      
+      // Use setTimeout to ensure state updates happen in correct order
+      setTimeout(() => {
+        setImageFile(file)
+        
+        const reader = new FileReader()
+        
+        reader.onerror = (error) => {
+          console.error('FileReader error:', error)
+          setError('Failed to read image file. Please try again.')
+          setImageFile(null)
+          setUploadedImage(null)
+        }
+        
+        reader.onloadend = () => {
+          try {
+            if (reader.result && typeof reader.result === 'string') {
+              // Use setTimeout to batch state updates
+              setTimeout(() => {
+                setUploadedImage(reader.result as string)
+              }, 0)
+            } else {
+              setError('Failed to load image. Please try again.')
+              setImageFile(null)
+              setUploadedImage(null)
+            }
+          } catch (err) {
+            console.error('Error in onloadend:', err)
+            setError('An error occurred while processing the image.')
+            setImageFile(null)
+            setUploadedImage(null)
+          }
+        }
+        
+        try {
+          reader.readAsDataURL(file)
+        } catch (readError) {
+          console.error('Error reading file:', readError)
+          setError('Failed to read image file. Please try again.')
+          setImageFile(null)
+        }
+      }, 0)
+      
+    } catch (error) {
+      console.error('Error processing image:', error)
+      setError('An error occurred while processing the image. Please try again.')
+      setImageFile(null)
+      setUploadedImage(null)
+      setIsDragging(false)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy'
+    }
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Only set dragging to false if we're actually leaving the dropzone
+    // (not just moving to a child element)
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX
+    const y = e.clientY
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setIsDragging(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    try {
+      const dataTransfer = e.dataTransfer
+      if (!dataTransfer) {
+        setError('Drop event has no data transfer')
+        return
+      }
+
+      const files = dataTransfer.files
+      if (!files || files.length === 0) {
+        setError('Please drop an image file')
+        return
+      }
+
+      const imageFiles = Array.from(files).filter(file => {
+        return file.type && file.type.startsWith('image/')
+      })
+      
+      if (imageFiles.length > 0) {
+        const file = imageFiles[0]
+        // Validate file size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+          setError('Image file is too large. Maximum size is 10MB.')
+          return
+        }
+        processImageFile(file)
+      } else {
+        setError('Please drop an image file (PNG, JPG, etc.)')
+      }
+    } catch (error) {
+      console.error('Error handling drop:', error)
+      setError('An error occurred while processing the dropped file. Please try again.')
+      setIsDragging(false)
     }
   }
 
@@ -205,6 +391,32 @@ Provide an expanded, more detailed version that includes:
 
       const ai = new GoogleGenAI({ apiKey })
 
+      // Load active brand profile if available
+      let brandContext = ''
+      let activeProfileId: string | null = null
+      if (user) {
+        try {
+          const { data: activeProfile } = await brandProfiles.getActiveBrandProfile(user.id)
+          if (activeProfile) {
+            activeProfileId = activeProfile.id
+            brandContext = `\n\nBRAND CONTEXT (use this to personalize the ad):
+- Brand Name: ${activeProfile.brand_name || 'N/A'}
+- Industry: ${activeProfile.industry || 'N/A'}
+- Brand Voice: ${activeProfile.brand_voice || 'N/A'}
+- Tone Keywords: ${(activeProfile.tone_keywords || []).join(', ') || 'N/A'}
+- Target Audience: ${activeProfile.target_audience?.age_range ? `Age ${activeProfile.target_audience.age_range}` : ''} ${activeProfile.target_audience?.gender ? activeProfile.target_audience.gender : ''} ${(activeProfile.target_audience?.interests || []).length > 0 ? `Interested in: ${activeProfile.target_audience.interests.join(', ')}` : ''}
+- Product USP: ${activeProfile.product_info?.usp || 'N/A'}
+- Preferred Hashtags: ${(activeProfile.marketing_preferences?.hashtags || []).join(', ') || 'N/A'}
+- Common CTAs: ${(activeProfile.marketing_preferences?.ctas || []).join(', ') || 'N/A'}
+- Brand Colors: ${(activeProfile.marketing_preferences?.colors || []).join(', ') || 'N/A'}
+
+IMPORTANT: Incorporate the brand voice, target audience, and marketing preferences into the ad design. Use the brand colors and CTAs where appropriate. Make the ad feel authentic to this brand's identity.`
+          }
+        } catch (error) {
+          console.log('No active brand profile found, proceeding without brand context')
+        }
+      }
+
       // Convert image to base64
       const base64Image = uploadedImage.split(',')[1]
       
@@ -216,6 +428,7 @@ Provide an expanded, more detailed version that includes:
 
 Based on the uploaded image and the following requirements:
 ${prompt}
+${brandContext}
 
 Edit and enhance the image to create an ad. You can:
 - Add text overlays
@@ -263,6 +476,15 @@ Generate a professional, eye-catching ad image.`
 
       // Set the generated image (not text)
       setGeneratedAd(generatedImageUrl)
+      
+      // Increment usage count for active brand profile
+      if (activeProfileId) {
+        try {
+          await brandProfiles.incrementUsageCount(activeProfileId)
+        } catch (error) {
+          console.warn('Failed to increment usage count:', error)
+        }
+      }
     } catch (err: any) {
       console.error('Error generating ad:', err)
       setError(err.message || 'Failed to generate ad. Please try again.')
@@ -398,6 +620,7 @@ Generate a professional, eye-catching ad image.`
       />
 
       <main className="dashboard-content" style={{ padding: '40px', maxWidth: '1600px', margin: '0 auto' }}>
+        <BrandMemoryMapBanner onNavigate={onNavigate} />
         <div style={{ display: 'grid', gridTemplateColumns: '550px 1fr', gap: '80px' }}>
           
           {/* LEFT SIDEBAR: CONTROLS */}
@@ -448,27 +671,42 @@ Generate a professional, eye-catching ad image.`
                   >×</button>
                 </div>
               ) : (
-                <label
-                  htmlFor="ad-image-upload"
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={(e) => {
+                    // Only trigger file input if not dragging
+                    if (!isDragging) {
+                      const input = document.getElementById('ad-image-upload') as HTMLInputElement
+                      input?.click()
+                    }
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     aspectRatio: '1',
-                    border: '2px dashed #d0d0d0',
+                    border: `2px dashed ${isDragging ? '#667eea' : '#d0d0d0'}`,
                     borderRadius: '10px',
-                    background: '#fafafa',
+                    background: isDragging ? '#f0f4ff' : '#fafafa',
                     cursor: 'pointer',
                     transition: 'all 0.3s ease',
-                    minHeight: '200px'
+                    minHeight: '200px',
+                    transform: isDragging ? 'scale(1.02)' : 'scale(1)',
+                    boxShadow: isDragging ? '0 8px 24px rgba(102, 126, 234, 0.2)' : 'none'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#ef4444'
-                    e.currentTarget.style.background = '#fff5f5'
+                    if (!isDragging) {
+                      e.currentTarget.style.borderColor = '#667eea'
+                      e.currentTarget.style.background = '#f0f4ff'
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#d0d0d0'
-                    e.currentTarget.style.background = '#fafafa'
+                    if (!isDragging) {
+                      e.currentTarget.style.borderColor = '#d0d0d0'
+                      e.currentTarget.style.background = '#fafafa'
+                    }
                   }}
                 >
                   <input
@@ -478,7 +716,7 @@ Generate a professional, eye-catching ad image.`
                     onChange={handleImageUpload}
                     style={{ display: 'none' }}
                   />
-                  <div style={{ textAlign: 'center', color: '#999' }}>
+                  <div style={{ textAlign: 'center', color: isDragging ? '#667eea' : '#999', pointerEvents: 'none' }}>
                     <svg 
                       width="48" 
                       height="48" 
@@ -494,10 +732,12 @@ Generate a professional, eye-catching ad image.`
                       <circle cx="8.5" cy="8.5" r="1.5"></circle>
                       <polyline points="21 15 16 10 5 21"></polyline>
                     </svg>
-                    <p style={{ fontSize: '14px', fontWeight: '500', margin: 0 }}>Click to upload image</p>
+                    <p style={{ fontSize: '14px', fontWeight: '500', margin: 0 }}>
+                      {isDragging ? 'Drop image here' : 'Click or drag to upload image'}
+                    </p>
                     <p style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>PNG, JPG up to 10MB</p>
                   </div>
-                </label>
+                </div>
               )}
             </div>
 

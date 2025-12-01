@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality } from '@google/genai'
-import { tokens } from './supabase'
+import { tokens, brandProfiles } from './supabase'
 import { notifyTokenUpdate } from '../contexts/TokenContext'
 
 // Gemini API key - must be set in .env file
@@ -241,6 +241,23 @@ export const generateDressedModel = async (options: DressModelOptions): Promise<
     
     console.log('✅ Token check passed')
     
+    // Load active brand profile if available
+    let brandContext = ''
+    try {
+      const { data: activeProfile } = await brandProfiles.getActiveBrandProfile(userId)
+      if (activeProfile) {
+        brandContext = `\n\nBRAND CONTEXT (use this to personalize the scene and styling):
+- Brand Name: ${activeProfile.brand_name || 'N/A'}
+- Brand Voice: ${activeProfile.brand_voice || 'N/A'}
+- Target Audience: ${activeProfile.target_audience?.age_range ? `Age ${activeProfile.target_audience.age_range}` : ''} ${activeProfile.target_audience?.gender ? activeProfile.target_audience.gender : ''}
+- Brand Colors: ${(activeProfile.marketing_preferences?.colors || []).join(', ') || 'N/A'}
+
+IMPORTANT: Style the scene and model presentation to match the brand's identity and appeal to the target audience.`
+      }
+    } catch (error) {
+      console.log('No active brand profile found, proceeding without brand context')
+    }
+    
     // Fetch the original model image
     console.log('📥 Fetching model image from:', modelImageUrl)
     const modelImageResponse = await fetch(modelImageUrl)
@@ -275,6 +292,7 @@ YOUR TASK:
 Generate a new photo of the EXACT SAME PERSON from IMAGE 1 (first image), but now wearing ${clothingDescription} from the subsequent clothing images.
 
 Scene/Setting: ${backgroundPrompt}
+${brandContext}
 
 🔒 MANDATORY REQUIREMENTS:
 1. FACE: Use the EXACT face from IMAGE 1 - same person, same facial features, same skin tone, same eye color, same nose, same mouth, IDENTICAL facial structure
@@ -412,6 +430,8 @@ interface GenerateCaptionsOptions {
   imageUrl: string
   clothingDescription?: string
   sceneDescription?: string
+  language?: string // Language code or name (e.g., 'en', 'sr', 'Serbian', 'English')
+  userId?: string // Optional: for loading brand profile
   instagramOptions?: {
     tone?: 'casual' | 'medium' | 'formal'
     length?: 'short' | 'medium' | 'long'
@@ -435,7 +455,34 @@ export const generateSocialMediaCaptions = async (options: GenerateCaptionsOptio
   emailSubject: string
 }> => {
   try {
-    const { imageUrl, clothingDescription, sceneDescription, instagramOptions, facebookOptions, emailOptions } = options
+    const { imageUrl, clothingDescription, sceneDescription, language, userId, instagramOptions, facebookOptions, emailOptions } = options
+    
+    // Load active brand profile if userId is provided
+    let brandContext = ''
+    if (userId) {
+      try {
+        const { data: activeProfile } = await brandProfiles.getActiveBrandProfile(userId)
+        if (activeProfile) {
+          brandContext = `\n\nBRAND CONTEXT (use this to personalize all captions):
+- Brand Name: ${activeProfile.brand_name || 'N/A'}
+- Industry: ${activeProfile.industry || 'N/A'}
+- Brand Voice: ${activeProfile.brand_voice || 'N/A'}
+- Tone Keywords: ${(activeProfile.tone_keywords || []).join(', ') || 'N/A'}
+- Target Audience: ${activeProfile.target_audience?.age_range ? `Age ${activeProfile.target_audience.age_range}` : ''} ${activeProfile.target_audience?.gender ? activeProfile.target_audience.gender : ''} ${(activeProfile.target_audience?.interests || []).length > 0 ? `Interested in: ${activeProfile.target_audience.interests.join(', ')}` : ''}
+- Product USP: ${activeProfile.product_info?.usp || 'N/A'}
+- Preferred Hashtags: ${(activeProfile.marketing_preferences?.hashtags || []).join(', ') || 'N/A'}
+- Common CTAs: ${(activeProfile.marketing_preferences?.ctas || []).join(', ') || 'N/A'}
+- Brand Colors: ${(activeProfile.marketing_preferences?.colors || []).join(', ') || 'N/A'}
+
+IMPORTANT: Write captions in the brand's voice and tone. Use the preferred hashtags and CTAs where appropriate. Make captions feel authentic to this brand's identity and speak to the target audience.`
+          
+          // Increment usage count
+          await brandProfiles.incrementUsageCount(activeProfile.id)
+        }
+      } catch (error) {
+        console.log('No active brand profile found, proceeding without brand context')
+      }
+    }
     
     // Default options
     const instagramTone = instagramOptions?.tone || 'medium'
@@ -490,7 +537,15 @@ export const generateSocialMediaCaptions = async (options: GenerateCaptionsOptio
     const base64Data = base64Image.split(',')[1]
     const imagePart = { inlineData: { data: base64Data, mimeType: blob.type } }
     
+    // Language instruction
+    const languageInstruction = language 
+      ? `IMPORTANT: Write ALL captions in ${language} language. Use proper grammar, spelling, and natural expressions for ${language}.`
+      : 'Write captions in English (default).'
+    
     const prompt = `Analyze this fashion model image and create four different social media/marketing captions:
+${brandContext}
+
+${languageInstruction}
 
 1. INSTAGRAM: Create a natural Instagram caption with:
    - Tone: ${instagramToneDesc}

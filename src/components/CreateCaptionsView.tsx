@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { generateSocialMediaCaptions, expandTextWithAI } from '../lib/gemini'
-import { storage, userHistory } from '../lib/supabase'
+import { storage, userHistory, aiGeneratedContent } from '../lib/supabase'
 import PageHeader from './PageHeader'
 import JSZip from 'jszip'
 
@@ -96,6 +96,7 @@ const CreateCaptionsView: React.FC<CreateCaptionsViewProps> = ({ imageUrl, scene
       const generated = await generateSocialMediaCaptions({
         imageUrl: imageToUse,
         sceneDescription: currentScenePrompt || scenePrompt,
+        userId: user?.id, // Pass userId to load brand profile
         instagramOptions: platform === 'instagram' ? instagramOptions : undefined,
         facebookOptions: platform === 'facebook' ? facebookOptions : undefined,
         emailOptions: platform === 'email' ? emailOptions : undefined
@@ -114,11 +115,11 @@ const CreateCaptionsView: React.FC<CreateCaptionsViewProps> = ({ imageUrl, scene
           activityType: 'create_captions',
           imageUrl: imageToUse || null,
           captions: {
-            [platform]: generated[platform],
-            emailSubject: platform === 'email' ? generated.emailSubject : undefined
-          },
+            [platform]: generated[platform]
+          } as any,
           metadata: {
             platform: platform,
+            emailSubject: platform === 'email' ? generated.emailSubject : undefined,
             instagramOptions: platform === 'instagram' ? instagramOptions : undefined,
             facebookOptions: platform === 'facebook' ? facebookOptions : undefined,
             emailOptions: platform === 'email' ? emailOptions : undefined,
@@ -126,6 +127,31 @@ const CreateCaptionsView: React.FC<CreateCaptionsViewProps> = ({ imageUrl, scene
             productPrice: productPrice || undefined
           }
         }).catch(err => console.error('Error saving activity history:', err))
+
+        // Autosave to AI generated content
+        try {
+          await aiGeneratedContent.saveContent({
+            userId: user.id,
+            contentType: `caption_${platform}` as any,
+            title: `${platform.charAt(0).toUpperCase() + platform.slice(1)} Caption`,
+            imageUrl: imageToUse || undefined,
+            prompt: currentScenePrompt || scenePrompt || undefined,
+            captions: {
+              [platform]: generated[platform],
+              emailSubject: platform === 'email' ? generated.emailSubject : undefined
+            },
+            generationSettings: {
+              platform: platform,
+              instagramOptions: platform === 'instagram' ? instagramOptions : undefined,
+              facebookOptions: platform === 'facebook' ? facebookOptions : undefined,
+              emailOptions: platform === 'email' ? emailOptions : undefined,
+              productName: productName || undefined,
+              productPrice: productPrice || undefined
+            }
+          }).catch(err => console.error('Error autosaving caption:', err))
+        } catch (err) {
+          console.error('Error autosaving caption:', err)
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Failed to generate caption.')

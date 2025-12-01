@@ -58,3 +58,4 @@ CREATE POLICY "Users can update their own clothing library"
 -- Step 7: Grant necessary permissions
 GRANT SELECT, INSERT, UPDATE, DELETE ON user_clothing_library TO authenticated;
 
+

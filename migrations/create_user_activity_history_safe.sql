@@ -74,3 +74,4 @@ $$;
 GRANT SELECT, INSERT, DELETE ON user_activity_history TO authenticated;
 GRANT EXECUTE ON FUNCTION cleanup_old_activity_history TO authenticated;
 
+

@@ -15,6 +15,10 @@ import CreateCaptionsView from './CreateCaptionsView'
 import MarketingView from './MarketingView'
 import ContentCalendarView from './ContentCalendarView'
 import AnalyticsDashboardView from './AnalyticsDashboardView'
+import BrandMemoryMap from './BrandMemoryMap'
+import BrandMemoryMapBanner from './BrandMemoryMapBanner'
+import BrandProfileUpgrade from './BrandProfileUpgrade'
+import HistoryGallery from './HistoryGallery'
 
 interface FashionModel {
   id: string
@@ -32,7 +36,7 @@ const Dashboard: React.FC = () => {
   const [modelsCount, setModelsCount] = useState(0)
   const [dressedModelsCount, setDressedModelsCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'create-model-upload' | 'create-model-ai' | 'dress-model' | 'view-models' | 'gallery' | 'subscription' | 'pricing' | 'edit-image' | 'generate-video' | 'create-captions' | 'marketing' | 'create-instagram-ad' | 'create-facebook-ad' | 'content-calendar' | 'analytics'>('dashboard')
+  const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'create-model-upload' | 'create-model-ai' | 'dress-model' | 'view-models' | 'gallery' | 'subscription' | 'pricing' | 'edit-image' | 'generate-video' | 'create-captions' | 'marketing' | 'create-instagram-ad' | 'create-facebook-ad' | 'content-calendar' | 'analytics' | 'brand-memory-map' | 'brand-profile-upgrade' | 'history-gallery'>('dashboard')
   const [selectedModelForDressing, setSelectedModelForDressing] = useState<FashionModel | null>(null)
   const [showCreateMenu, setShowCreateMenu] = useState(false)
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null)
@@ -276,8 +280,34 @@ const Dashboard: React.FC = () => {
     )
   }
 
+  if (currentView === 'brand-memory-map') {
+    return (
+      <BrandMemoryMap 
+        onBack={() => setCurrentView('dashboard')}
+        onNavigate={(view) => setCurrentView(view as any)}
+      />
+    )
+  }
+
+  if (currentView === 'brand-profile-upgrade') {
+    return (
+      <BrandProfileUpgrade 
+        onBack={() => setCurrentView('brand-memory-map')}
+        onNavigate={(view) => setCurrentView(view as any)}
+        onSuccess={() => setCurrentView('brand-memory-map')}
+      />
+    )
+  }
+
   if (currentView === 'gallery') {
     return <Gallery 
+      onBack={() => setCurrentView('dashboard')} 
+      onNavigate={(view) => setCurrentView(view as any)}
+    />
+  }
+
+  if (currentView === 'history-gallery') {
+    return <HistoryGallery 
       onBack={() => setCurrentView('dashboard')} 
       onNavigate={(view) => setCurrentView(view as any)}
     />
@@ -406,6 +436,7 @@ const Dashboard: React.FC = () => {
       )}
 
       <main className="dashboard-content" style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto' }} onClick={() => setShowCreateMenu(false)}>
+        <BrandMemoryMapBanner onNavigate={(view) => setCurrentView(view as any)} />
         
         {/* Top Section: Stats & Quick Create */}
         <div style={{ 
@@ -873,25 +904,25 @@ const Dashboard: React.FC = () => {
           <div 
             onClick={() => setCurrentView('marketing')}
             style={{
-              background: 'linear-gradient(135deg, #ffffff 0%, #fff5f5 100%)',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%)',
               borderRadius: '16px',
               padding: '50px',
               cursor: 'pointer',
               transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
               position: 'relative',
               overflow: 'hidden',
-              border: '2px solid #fee2e2',
-              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.08)'
+              border: '2px solid #e8ebff',
+              boxShadow: '0 4px 20px rgba(102, 126, 234, 0.08)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#ef4444'
+              e.currentTarget.style.borderColor = '#667eea'
               e.currentTarget.style.transform = 'translateY(-4px)'
-              e.currentTarget.style.boxShadow = '0 12px 40px rgba(239, 68, 68, 0.15)'
+              e.currentTarget.style.boxShadow = '0 12px 40px rgba(102, 126, 234, 0.15)'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#fee2e2'
+              e.currentTarget.style.borderColor = '#e8ebff'
               e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = '0 4px 20px rgba(239, 68, 68, 0.08)'
+              e.currentTarget.style.boxShadow = '0 4px 20px rgba(102, 126, 234, 0.08)'
             }}
           >
             {/* Decorative Background Elements */}
@@ -902,7 +933,7 @@ const Dashboard: React.FC = () => {
               width: '200px',
               height: '200px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%)',
+              background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
               opacity: 0.5
             }}></div>
             <div style={{
@@ -912,7 +943,7 @@ const Dashboard: React.FC = () => {
               width: '150px',
               height: '150px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(220, 38, 38, 0.08) 100%)',
+              background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%)',
               opacity: 0.5
             }}></div>
 
@@ -922,11 +953,11 @@ const Dashboard: React.FC = () => {
                   width: '70px', 
                   height: '70px', 
                   borderRadius: '16px', 
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center',
-                  boxShadow: '0 8px 24px rgba(239, 68, 68, 0.3)',
+                  boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)',
                   flexShrink: 0
                 }}>
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
@@ -963,7 +994,7 @@ const Dashboard: React.FC = () => {
                 gap: '12px',
                 marginTop: '35px',
                 paddingTop: '30px',
-                borderTop: '1px solid #fee2e2',
+                borderTop: '1px solid #e8ebff',
                 flexWrap: 'wrap'
               }}>
                 <div 
@@ -973,12 +1004,12 @@ const Dashboard: React.FC = () => {
                   }}
                   style={{
                     padding: '14px 28px',
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     color: '#fff',
                     fontSize: '15px',
                     fontWeight: '700',
                     borderRadius: '12px',
-                    boxShadow: '0 6px 20px rgba(239, 68, 68, 0.3)',
+                    boxShadow: '0 6px 20px rgba(102, 126, 234, 0.3)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
@@ -987,11 +1018,11 @@ const Dashboard: React.FC = () => {
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(239, 68, 68, 0.4)'
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(102, 126, 234, 0.4)'
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.3)'
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.3)'
                   }}
                 >
                   <span>Create Ad</span>
@@ -1007,8 +1038,8 @@ const Dashboard: React.FC = () => {
                   style={{
                     padding: '14px 28px',
                     background: '#fff',
-                    color: '#ef4444',
-                    border: '2px solid #ef4444',
+                    color: '#667eea',
+                    border: '2px solid #e8ebff',
                     fontSize: '15px',
                     fontWeight: '700',
                     borderRadius: '12px',
@@ -1019,11 +1050,13 @@ const Dashboard: React.FC = () => {
                     cursor: 'pointer'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#fee2e2'
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)'
+                    e.currentTarget.style.borderColor = '#667eea'
                     e.currentTarget.style.transform = 'translateY(-2px)'
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = '#fff'
+                    e.currentTarget.style.borderColor = '#e8ebff'
                     e.currentTarget.style.transform = 'translateY(0)'
                   }}
                 >
@@ -1037,8 +1070,8 @@ const Dashboard: React.FC = () => {
                   style={{
                     padding: '14px 28px',
                     background: '#fff',
-                    color: '#ef4444',
-                    border: '2px solid #ef4444',
+                    color: '#667eea',
+                    border: '2px solid #e8ebff',
                     fontSize: '15px',
                     fontWeight: '700',
                     borderRadius: '12px',
@@ -1049,11 +1082,13 @@ const Dashboard: React.FC = () => {
                     cursor: 'pointer'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#fee2e2'
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)'
+                    e.currentTarget.style.borderColor = '#667eea'
                     e.currentTarget.style.transform = 'translateY(-2px)'
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = '#fff'
+                    e.currentTarget.style.borderColor = '#e8ebff'
                     e.currentTarget.style.transform = 'translateY(0)'
                   }}
                 >
@@ -1064,7 +1099,123 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Gallery Teaser (Optional, subtle at bottom) */}
+        {/* Brand Memory Map Section */}
+        <div style={{ marginTop: '60px' }}>
+          <div 
+            onClick={() => setCurrentView('brand-memory-map')}
+            style={{
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%)',
+              borderRadius: '16px',
+              padding: '50px',
+              cursor: 'pointer',
+              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+              position: 'relative',
+              overflow: 'hidden',
+              border: '2px solid #e8ebff',
+              boxShadow: '0 4px 20px rgba(102, 126, 234, 0.08)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#667eea'
+              e.currentTarget.style.transform = 'translateY(-4px)'
+              e.currentTarget.style.boxShadow = '0 12px 40px rgba(102, 126, 234, 0.15)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#e8ebff'
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = '0 4px 20px rgba(102, 126, 234, 0.08)'
+            }}
+          >
+            {/* Decorative Background Elements */}
+            <div style={{
+              position: 'absolute',
+              top: '-50px',
+              right: '-50px',
+              width: '200px',
+              height: '200px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+              opacity: 0.5
+            }}></div>
+            <div style={{
+              position: 'absolute',
+              bottom: '-30px',
+              left: '-30px',
+              width: '150px',
+              height: '150px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%)',
+              opacity: 0.5
+            }}></div>
+
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '30px' }}>
+                <div style={{ 
+                  width: '70px', 
+                  height: '70px', 
+                  borderRadius: '16px', 
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)',
+                  flexShrink: 0
+                }}>
+                  <span style={{ fontSize: '32px' }}>🧠</span>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h2 style={{ 
+                    fontSize: '32px', 
+                    fontWeight: '700', 
+                    color: '#1a202c', 
+                    margin: '0 0 8px 0', 
+                    letterSpacing: '-0.5px',
+                    lineHeight: '1.2'
+                  }}>
+                    Brand Memory Map
+                  </h2>
+                  <p style={{ 
+                    fontSize: '16px', 
+                    color: '#64748b', 
+                    margin: 0,
+                    lineHeight: '1.5'
+                  }}>
+                    Store your brand information for personalized AI-generated content
+                  </p>
+                </div>
+              </div>
+
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginTop: '35px',
+                paddingTop: '30px',
+                borderTop: '1px solid #e8ebff'
+              }}>
+                <div style={{
+                  padding: '14px 28px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: '#fff',
+                  fontSize: '15px',
+                  fontWeight: '700',
+                  borderRadius: '12px',
+                  boxShadow: '0 6px 20px rgba(102, 126, 234, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  transition: 'all 0.3s'
+                }}>
+                  <span>Manage Profiles</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Gallery Link (Optional, subtle at bottom) */}
         {dressedModelsCount > 0 && (
           <div 
             onClick={() => setCurrentView('gallery')}

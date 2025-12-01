@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase, userHistory } from '../lib/supabase'
+import { supabase, userHistory, aiGeneratedContent } from '../lib/supabase'
 import { generateFashionModel, generateModelFromUploadedImage } from '../lib/gemini'
 import PageHeader from './PageHeader'
 
@@ -114,11 +114,13 @@ const CreateModel: React.FC<CreateModelProps> = ({ mode = 'ai', onBack, onViewMo
       }
 
       let imageUrl: string
+      let constructedPrompt = ''
 
       // If user uploaded an image in upload mode, just crop and use it
       if (mode === 'upload' && uploadedImage) {
         // Crop image to square format
         imageUrl = await cropImageToSquare(uploadedImage)
+        constructedPrompt = 'Uploaded image'
       } 
       // Otherwise, generate new AI model based on characteristics
       else {
@@ -133,7 +135,7 @@ const CreateModel: React.FC<CreateModelProps> = ({ mode = 'ai', onBack, onViewMo
           ? 'fit athletic body type'
           : 'plus-size curvy body type'
         
-        const constructedPrompt = `A professional fashion model portrait, ${gender}, ${bodyDescription}, ${ethnicity} ethnicity, ${hairColor} hair, ${eyeColor} eyes ${beardDescription}, ${swimwearDescription}. Close-up shot showing the face and upper body (head and shoulders), tight crop, professional studio lighting, neutral background, editorial fashion photography style, photorealistic, high resolution portrait.`
+        constructedPrompt = `A professional fashion model portrait, ${gender}, ${bodyDescription}, ${ethnicity} ethnicity, ${hairColor} hair, ${eyeColor} eyes ${beardDescription}, ${swimwearDescription}. Close-up shot showing the face and upper body (head and shoulders), tight crop, professional studio lighting, neutral background, editorial fashion photography style, photorealistic, high resolution portrait.`
         
         console.log('Generated prompt:', constructedPrompt)
         
@@ -148,12 +150,39 @@ const CreateModel: React.FC<CreateModelProps> = ({ mode = 'ai', onBack, onViewMo
         id: Date.now().toString(),
         imageUrl: imageUrl,
         type: mode === 'upload' ? 'uploaded' : 'ai_generated',
-        prompt: '',
+        prompt: constructedPrompt,
         createdAt: new Date().toISOString()
       }
       
       setGeneratedModel(aiModel)
       setSuccess(true)
+
+      // Autosave to AI generated content
+      if (user?.id) {
+        try {
+          await aiGeneratedContent.saveContent({
+            userId: user.id,
+            contentType: 'model',
+            title: `Model ${mode === 'upload' ? '(Uploaded)' : '(AI Generated)'}`,
+            imageUrl: imageUrl,
+            prompt: constructedPrompt,
+            generationSettings: mode === 'upload' ? { mode: 'upload' } : {
+              mode: 'ai',
+              gender,
+              bodyType,
+              ethnicity,
+              hairColor,
+              eyeColor,
+              hasBeard
+            },
+            contentData: {
+              type: mode === 'upload' ? 'uploaded' : 'ai_generated'
+            }
+          }).catch(err => console.error('Error autosaving model:', err))
+        } catch (err) {
+          console.error('Error autosaving model:', err)
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to generate AI model. Please try again.')
     } finally {
