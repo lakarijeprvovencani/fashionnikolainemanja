@@ -27,6 +27,8 @@ import CreateCaptionsNovo from './CreateCaptionsNovo'
 import EditImageView from './EditImageView'
 import EditImageNovo from './EditImageNovo'
 import SubscriptionNovo from './SubscriptionNovo'
+import AccountNovo from './AccountNovo'
+import PricingNovo from './PricingNovo'
 
 interface DashboardNovoProps {
   onBack?: () => void
@@ -186,11 +188,36 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
     />
   }
 
+  if (internalView === 'account') {
+    return <AccountNovo 
+      onBack={() => setInternalView('dashboard')}
+      onNavigate={(view) => {
+        if (view === 'subscription') {
+          setInternalView('subscription')
+        } else if (view === 'pricing') {
+          setInternalView('pricing')
+        } else {
+          onNavigate(view)
+        }
+      }}
+    />
+  }
+
   if (internalView === 'subscription') {
     return <SubscriptionNovo 
-      onBack={() => setInternalView('dashboard')}
+      onBack={() => setInternalView('account')}
       onNavigate={onNavigate}
-      onUpgrade={() => onNavigate('pricing')}
+      onUpgrade={() => setInternalView('pricing')}
+    />
+  }
+
+  if (internalView === 'pricing') {
+    return <PricingNovo 
+      onBack={() => setInternalView('account')}
+      onNavigate={onNavigate}
+      onSuccess={() => {
+        setInternalView('subscription')
+      }}
     />
   }
 
@@ -415,7 +442,7 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
             </div>
           </div>
           <div 
-            onClick={() => setInternalView('subscription')}
+            onClick={() => setInternalView('account')}
             style={{
               width: '40px',
               height: '40px',
@@ -425,7 +452,14 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
