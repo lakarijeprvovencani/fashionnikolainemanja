@@ -15,6 +15,16 @@ const BrandMemoryMapBanner: React.FC<BrandMemoryMapBannerProps> = ({ onComplete,
 
   useEffect(() => {
     checkProfile()
+    
+    // Listen for brand profiles update event
+    const handleUpdate = () => {
+      checkProfile()
+    }
+    window.addEventListener('brand-profiles-updated', handleUpdate)
+    
+    return () => {
+      window.removeEventListener('brand-profiles-updated', handleUpdate)
+    }
   }, [user])
 
   const checkProfile = async () => {
@@ -24,19 +34,38 @@ const BrandMemoryMapBanner: React.FC<BrandMemoryMapBannerProps> = ({ onComplete,
     }
 
     try {
-      // Check if banner was dismissed
-      const dismissedKey = `brand_memory_map_banner_dismissed_${user.id}`
-      const isDismissed = localStorage.getItem(dismissedKey) === 'true'
-      
-      if (isDismissed) {
-        setDismissed(true)
-        setLoading(false)
-        return
-      }
-
       // Check if user has any brand profile
       const { data } = await brandProfiles.getUserBrandProfiles(user.id)
-      setHasProfile((data || []).length > 0)
+      const profileCount = (data || []).length
+      setHasProfile(profileCount > 0)
+
+      // If user has no profiles, check if banner was dismissed today
+      if (profileCount === 0) {
+        const dismissedKey = `brand_memory_map_banner_dismissed_${user.id}`
+        const dismissedTimestamp = localStorage.getItem(dismissedKey)
+        
+        if (dismissedTimestamp) {
+          const dismissedDate = new Date(dismissedTimestamp)
+          const now = new Date()
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          const dismissedDay = new Date(dismissedDate.getFullYear(), dismissedDate.getMonth(), dismissedDate.getDate())
+          
+          // Show banner again if it's a new day (24 hours passed)
+          if (dismissedDay.getTime() < today.getTime()) {
+            // It's a new day, show banner again
+            localStorage.removeItem(dismissedKey)
+            setDismissed(false)
+          } else {
+            // Same day, keep dismissed
+            setDismissed(true)
+          }
+        } else {
+          setDismissed(false)
+        }
+      } else {
+        // User has profiles, don't show banner
+        setDismissed(true)
+      }
     } catch (error) {
       console.error('Error checking profile:', error)
     } finally {
@@ -47,7 +76,8 @@ const BrandMemoryMapBanner: React.FC<BrandMemoryMapBannerProps> = ({ onComplete,
   const handleDismiss = () => {
     if (!user) return
     const dismissedKey = `brand_memory_map_banner_dismissed_${user.id}`
-    localStorage.setItem(dismissedKey, 'true')
+    // Store current timestamp so we can check if it's a new day
+    localStorage.setItem(dismissedKey, new Date().toISOString())
     setDismissed(true)
     if (onComplete) onComplete()
   }
@@ -58,7 +88,11 @@ const BrandMemoryMapBanner: React.FC<BrandMemoryMapBannerProps> = ({ onComplete,
     }
   }
 
-  if (loading || dismissed || hasProfile) {
+  // Show banner if:
+  // - User has no profiles (0 profiles) AND
+  // - Banner wasn't dismissed today OR it's a new day
+  // Hide banner if loading, user has profiles, or banner was dismissed today
+  if (loading || hasProfile || dismissed) {
     return null
   }
 

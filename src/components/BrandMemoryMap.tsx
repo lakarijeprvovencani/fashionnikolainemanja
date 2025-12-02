@@ -212,6 +212,11 @@ const BrandMemoryMap: React.FC<BrandMemoryMapProps> = ({ onBack, onNavigate }) =
       await loadProfiles()
       setView('list')
       setEditingProfile(null)
+      
+      // Emit event to update banner
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('brand-profiles-updated'))
+      }
     } catch (error: any) {
       console.error('Error saving profile:', error)
       alert('Failed to save profile: ' + (error.message || 'Unknown error'))
@@ -227,6 +232,11 @@ const BrandMemoryMap: React.FC<BrandMemoryMapProps> = ({ onBack, onNavigate }) =
       const { error } = await brandProfiles.deleteBrandProfile(profileId)
       if (error) throw error
       await loadProfiles()
+      
+      // Emit event to update banner
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('brand-profiles-updated'))
+      }
     } catch (error: any) {
       console.error('Error deleting profile:', error)
       alert('Failed to delete profile: ' + (error.message || 'Unknown error'))

@@ -97,3 +97,4 @@ CREATE TRIGGER ensure_single_active_brand_profile
     EXECUTE FUNCTION ensure_single_active_profile();
 
 
+

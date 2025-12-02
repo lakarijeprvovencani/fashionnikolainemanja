@@ -19,6 +19,7 @@ import BrandMemoryMap from './BrandMemoryMap'
 import BrandMemoryMapBanner from './BrandMemoryMapBanner'
 import BrandProfileUpgrade from './BrandProfileUpgrade'
 import HistoryGallery from './HistoryGallery'
+import DashboardNovo from './DashboardNovo'
 
 interface FashionModel {
   id: string
@@ -36,7 +37,7 @@ const Dashboard: React.FC = () => {
   const [modelsCount, setModelsCount] = useState(0)
   const [dressedModelsCount, setDressedModelsCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'create-model-upload' | 'create-model-ai' | 'dress-model' | 'view-models' | 'gallery' | 'subscription' | 'pricing' | 'edit-image' | 'generate-video' | 'create-captions' | 'marketing' | 'create-instagram-ad' | 'create-facebook-ad' | 'content-calendar' | 'analytics' | 'brand-memory-map' | 'brand-profile-upgrade' | 'history-gallery'>('dashboard')
+  const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'create-model-upload' | 'create-model-ai' | 'dress-model' | 'view-models' | 'gallery' | 'subscription' | 'pricing' | 'edit-image' | 'generate-video' | 'create-captions' | 'marketing' | 'create-instagram-ad' | 'create-facebook-ad' | 'content-calendar' | 'analytics' | 'brand-memory-map' | 'brand-profile-upgrade' | 'history-gallery' | 'novo'>('dashboard')
   const [selectedModelForDressing, setSelectedModelForDressing] = useState<FashionModel | null>(null)
   const [showCreateMenu, setShowCreateMenu] = useState(false)
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null)
@@ -72,6 +73,13 @@ const Dashboard: React.FC = () => {
       checkUserModels()
     }
   }, [currentView])
+
+  // Check URL for /novo route
+  useEffect(() => {
+    if (window.location.pathname === '/novo' || window.location.hash === '#novo') {
+      setCurrentView('novo')
+    }
+  }, [])
 
   if (loading) {
     return (
@@ -313,6 +321,13 @@ const Dashboard: React.FC = () => {
     />
   }
 
+  if (currentView === 'novo') {
+    return <DashboardNovo 
+      onBack={() => setCurrentView('dashboard')} 
+      onNavigate={(view) => setCurrentView(view as any)}
+    />
+  }
+
   if (currentView === 'subscription') {
     return (
       <div className="dashboard" style={{ background: '#ffffff', minHeight: '100vh', fontFamily: '"Inter", sans-serif' }}>
@@ -345,6 +360,25 @@ const Dashboard: React.FC = () => {
         showBackButton={false}
         onNavigate={(view) => setCurrentView(view as any)}
       />
+
+      {/* Temporary link to new design - remove later */}
+      <div style={{ 
+        position: 'fixed', 
+        top: '20px', 
+        right: '20px', 
+        zIndex: 1000,
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '12px 24px',
+        borderRadius: '24px',
+        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+        cursor: 'pointer'
+      }}
+      onClick={() => setCurrentView('novo')}
+      >
+        <span style={{ color: 'white', fontWeight: '600', fontSize: '14px' }}>
+          View New Design
+        </span>
+      </div>
 
       {/* Free Plan Banner */}
       {isFreePlan && (

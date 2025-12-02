@@ -59,3 +59,4 @@ CREATE POLICY "Users can update their own clothing library"
 GRANT SELECT, INSERT, UPDATE, DELETE ON user_clothing_library TO authenticated;
 
 
+

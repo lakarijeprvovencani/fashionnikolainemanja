@@ -163,3 +163,4 @@ GRANT EXECUTE ON FUNCTION cleanup_expired_ai_content TO authenticated;
 -- Add comment to table
 COMMENT ON TABLE ai_generated_content IS 'Stores all AI-generated content with autosave functionality. Content expires after 30 days (90 days for favorites) to manage database load.';
 
+
