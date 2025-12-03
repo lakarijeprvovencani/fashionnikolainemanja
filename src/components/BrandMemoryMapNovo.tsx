@@ -861,23 +861,24 @@ const BrandMemoryMapNovo: React.FC<BrandMemoryMapNovoProps> = ({ onBack, onNavig
 
         {/* Profile Limit Info */}
         <div style={{
-          background: 'rgba(0, 0, 0, 0.4)',
+          background: 'rgba(0, 0, 0, 0.6)',
           borderRadius: '16px',
-          padding: '16px 20px',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          padding: '18px 24px',
+          border: '2px solid rgba(255, 255, 255, 0.15)',
           backdropFilter: 'blur(20px)',
           marginBottom: '24px',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '20px' }}>🧠</span>
-            <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}>
+            <span style={{ fontSize: '22px' }}>🧠</span>
+            <span style={{ fontSize: '15px', color: '#fff', fontWeight: '600' }}>
               Your Brand Profiles ({profiles.length}/{getProfileLimit()})
             </span>
             {profiles.length >= getProfileLimit() && (
-              <span style={{ fontSize: '12px', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '4px 10px', borderRadius: '12px' }}>
+              <span style={{ fontSize: '12px', color: '#fff', background: 'rgba(239, 68, 68, 0.3)', padding: '5px 12px', borderRadius: '12px', fontWeight: '600', border: '1px solid rgba(239, 68, 68, 0.5)' }}>
                 Limit reached
               </span>
             )}
@@ -958,21 +959,24 @@ const BrandMemoryMapNovo: React.FC<BrandMemoryMapNovoProps> = ({ onBack, onNavig
                 {profile.is_active && (
                   <div style={{
                     position: 'absolute',
-                    top: '16px',
+                    top: '12px',
                     right: '16px',
                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     color: '#fff',
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    fontSize: '10px',
+                    padding: '5px 10px',
+                    borderRadius: '16px',
+                    fontSize: '9px',
                     fontWeight: '700',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px'
+                    gap: '4px',
+                    boxShadow: '0 3px 8px rgba(102, 126, 234, 0.5)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    zIndex: 10
                   }}>
-                    ✓ Active
+                    <span style={{ fontSize: '10px' }}>✓</span> Active
                   </div>
                 )}
 
@@ -1076,34 +1080,65 @@ const BrandMemoryMapNovo: React.FC<BrandMemoryMapNovoProps> = ({ onBack, onNavig
                     onClick={() => handleEditClick(profile)}
                     style={{
                       flex: 1,
-                      padding: '12px',
-                      background: 'rgba(255,255,255,0.1)',
+                      padding: '14px 16px',
+                      background: 'rgba(102, 126, 234, 0.2)',
                       color: '#fff',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      borderRadius: '10px',
-                      fontSize: '12px',
-                      fontWeight: '600',
+                      border: '2px solid rgba(102, 126, 234, 0.5)',
+                      borderRadius: '12px',
+                      fontSize: '13px',
+                      fontWeight: '700',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '6px'
+                      gap: '8px',
+                      boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+                      backdropFilter: 'blur(10px)',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(102, 126, 234, 0.3)'
+                      e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.7)'
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.6)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
+                      e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
                     }}
                   >
-                    ✏️ Edit
+                    <span style={{ fontSize: '14px' }}>✏️</span> Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDelete(profile.id)}
                     style={{
-                      padding: '12px',
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      color: '#ef4444',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                      borderRadius: '10px',
-                      fontSize: '12px',
+                      padding: '14px 16px',
+                      background: 'rgba(239, 68, 68, 0.2)',
+                      color: '#fff',
+                      border: '2px solid rgba(239, 68, 68, 0.5)',
+                      borderRadius: '12px',
+                      fontSize: '14px',
                       fontWeight: '600',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      minWidth: '50px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)'
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(239, 68, 68, 0.5)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)'
                     }}
                   >
                     🗑️

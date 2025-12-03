@@ -550,9 +550,12 @@ Generate a professional, eye-catching ad image.`
           </div>
 
           <div style={{ marginTop: '40px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '32px', letterSpacing: '-0.5px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '12px', letterSpacing: '-0.5px', textAlign: 'center' }}>
               Choose Ad Platform
             </h2>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: '32px', maxWidth: '500px', margin: '0 auto 32px' }}>
+              Create professional ads for Instagram and Facebook
+            </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', maxWidth: '900px', margin: '0 auto' }}>
               <div
                 onClick={() => setSelectedAdType('instagram')}
@@ -652,105 +655,163 @@ Generate a professional, eye-catching ad image.`
 
           {/* Additional Tools Section */}
           <div style={{ marginTop: '60px' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '24px', letterSpacing: '-0.5px', textAlign: 'center', color: 'rgba(255,255,255,0.7)' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '12px', letterSpacing: '-0.5px', textAlign: 'center', color: 'rgba(255,255,255,0.7)' }}>
               Marketing Tools
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', maxWidth: '600px', margin: '0 auto' }}>
-              {/* Analytics */}
-              <div
-                onClick={() => onNavigate('analytics')}
-                style={{
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  borderRadius: '20px',
-                  padding: '24px',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  backdropFilter: 'blur(20px)',
-                  WebkitBackdropFilter: 'blur(20px)',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'
-                }}
-              >
-                <div style={{ 
-                  width: '48px', 
-                  height: '48px', 
-                  borderRadius: '14px', 
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                    <path d="M3 3v18h18"></path>
-                    <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
-                  </svg>
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px' }}>Analytics</h3>
-                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', margin: 0 }}>Track performance & insights</p>
-                </div>
-              </div>
-
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: '32px', maxWidth: '500px', margin: '0 auto 32px' }}>
+              Connect your social media accounts and manage your content strategy
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', maxWidth: '700px', margin: '0 auto' }}>
               {/* Content Calendar */}
               <div
                 onClick={() => onNavigate('content-calendar')}
                 style={{
                   background: 'rgba(0, 0, 0, 0.3)',
-                  borderRadius: '20px',
-                  padding: '24px',
+                  borderRadius: '24px',
+                  padding: '28px',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
                   backdropFilter: 'blur(20px)',
                   WebkitBackdropFilter: 'blur(20px)',
                   cursor: 'pointer',
                   transition: 'all 0.3s',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px'
+                  flexDirection: 'column',
+                  gap: '16px',
+                  position: 'relative',
+                  overflow: 'hidden'
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
-                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.transform = 'translateY(-4px)'
                   e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'
+                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(240, 147, 251, 0.2)'
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
                   e.currentTarget.style.transform = 'translateY(0)'
                   e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'
+                  e.currentTarget.style.boxShadow = 'none'
                 }}
               >
-                <div style={{ 
-                  width: '48px', 
-                  height: '48px', 
-                  borderRadius: '14px', 
-                  background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                    <line x1="3" y1="10" x2="21" y2="10"></line>
-                  </svg>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ 
+                    width: '56px', 
+                    height: '56px', 
+                    borderRadius: '16px', 
+                    background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    boxShadow: '0 4px 16px rgba(240, 147, 251, 0.3)',
+                    position: 'relative'
+                  }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="16" y1="2" x2="16" y2="6"></line>
+                      <line x1="8" y1="2" x2="8" y2="6"></line>
+                      <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    {/* Small notification dot */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-4px',
+                      right: '-4px',
+                      width: '12px',
+                      height: '12px',
+                      borderRadius: '50%',
+                      background: '#10b981',
+                      border: '2px solid rgba(0, 0, 0, 0.3)',
+                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.5)'
+                    }}></div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>Content Calendar</h3>
+                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>Schedule & publish posts</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '4px' }}>Content Calendar</h3>
-                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', margin: 0 }}>Schedule your posts</p>
+                <div style={{ 
+                  padding: '12px', 
+                  background: 'rgba(240, 147, 251, 0.1)', 
+                  borderRadius: '12px', 
+                  border: '1px solid rgba(240, 147, 251, 0.2)',
+                  fontSize: '11px',
+                  color: 'rgba(255,255,255,0.7)',
+                  lineHeight: '1.5'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                    <span style={{ fontWeight: '600' }}>Connect Instagram & Facebook</span>
+                  </div>
+                  Plan your content, set posting times, and automatically publish to your connected social media accounts
+                </div>
+              </div>
+
+              {/* Analytics */}
+              <div
+                onClick={() => onNavigate('analytics')}
+                style={{
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                  e.currentTarget.style.transform = 'translateY(-4px)'
+                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'
+                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(102, 126, 234, 0.2)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ 
+                    width: '56px', 
+                    height: '56px', 
+                    borderRadius: '16px', 
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    boxShadow: '0 4px 16px rgba(102, 126, 234, 0.3)'
+                  }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                      <path d="M3 3v18h18"></path>
+                      <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>Analytics</h3>
+                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>Track performance & insights</p>
+                  </div>
+                </div>
+                <div style={{ 
+                  padding: '12px', 
+                  background: 'rgba(102, 126, 234, 0.1)', 
+                  borderRadius: '12px', 
+                  border: '1px solid rgba(102, 126, 234, 0.2)',
+                  fontSize: '11px',
+                  color: 'rgba(255,255,255,0.7)',
+                  lineHeight: '1.5'
+                }}>
+                  Monitor your ad campaigns and get detailed insights into engagement, reach, and conversions
                 </div>
               </div>
             </div>
@@ -1220,7 +1281,7 @@ Generate a professional, eye-catching ad image.`
                   {/* Top Row */}
                   <div style={{ 
                     display: 'grid', 
-                    gridTemplateColumns: '1fr 1fr', 
+                    gridTemplateColumns: '1fr', 
                     gap: '10px',
                     marginBottom: '10px'
                   }}>
@@ -1267,49 +1328,6 @@ Generate a professional, eye-catching ad image.`
                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                       </svg>
                       <span>Edit Image</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (generatedAd && selectedAdType) {
-                          const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
-                          safeLocalStorage.setItem(`${prefix}_videoImage`, generatedAd)
-                        }
-                        safeLocalStorage.setItem('video_previousView', 'marketing')
-                        safeLocalStorage.setItem('video_adType', selectedAdType || 'instagram')
-                        onNavigate('generate-video')
-                      }}
-                      style={{
-                        padding: '10px',
-                        background: 'rgba(0, 0, 0, 0.2)',
-                        color: 'rgba(255,255,255,0.9)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        borderRadius: '8px',
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        backdropFilter: 'blur(10px)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
-                        e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
-                        e.currentTarget.style.transform = 'translateY(-2px)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)'
-                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
-                        e.currentTarget.style.transform = 'translateY(0)'
-                      }}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                      </svg>
-                      <span>Generate Video</span>
                     </button>
                   </div>
 

@@ -928,6 +928,141 @@ export const subscriptions = {
       .order('price', { ascending: true })
     
     return { data: data || [], error }
+  },
+
+  // Create Stripe checkout session
+  async createCheckoutSession(planId: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/create-checkout-session`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ planId }),
+        }
+      )
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create checkout session')
+      }
+
+      const data = await response.json()
+      return { data, error: null }
+    } catch (error: any) {
+      console.error('Error creating checkout session:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Create Stripe customer portal session
+  async createPortalSession() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/create-portal-session`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      )
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create portal session')
+      }
+
+      const data = await response.json()
+      return { data, error: null }
+    } catch (error: any) {
+      console.error('Error creating portal session:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Activate subscription with Stripe data (called from webhook)
+  async activateSubscriptionWithStripe(userId: string, planType: string, stripeData: {
+    customerId: string
+    subscriptionId: string
+    priceId: string
+  }) {
+    try {
+      // Get plan details
+      const { data: plan, error: planError } = await supabase
+        .from('subscription_plans')
+        .select('*')
+        .eq('id', planType)
+        .single()
+
+      if (planError || !plan) {
+        throw new Error('Invalid plan type')
+      }
+
+      // Calculate period end based on interval
+      const now = new Date()
+      let periodEnd = new Date(now)
+      
+      if (plan.interval === 'month') {
+        periodEnd.setMonth(periodEnd.getMonth() + 1)
+      } else if (plan.interval === '6months') {
+        periodEnd.setMonth(periodEnd.getMonth() + 6)
+      } else if (plan.interval === 'year') {
+        periodEnd.setFullYear(periodEnd.getFullYear() + 1)
+      }
+
+      // Update subscription with Stripe data
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .upsert({
+          user_id: userId,
+          plan_type: planType,
+          status: 'active',
+          tokens_limit: plan.tokens_per_period,
+          tokens_used: 0,
+          current_period_start: now.toISOString(),
+          current_period_end: periodEnd.toISOString(),
+          stripe_customer_id: stripeData.customerId,
+          stripe_subscription_id: stripeData.subscriptionId,
+          stripe_price_id: stripeData.priceId,
+        }, {
+          onConflict: 'user_id'
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Log initial token grant
+      await supabase
+        .from('token_transactions')
+        .insert({
+          user_id: userId,
+          amount: plan.tokens_per_period,
+          type: 'grant',
+          reason: `Subscription activated: ${plan.name}`,
+          balance_after: plan.tokens_per_period
+        })
+
+      return { success: true, data, error: null }
+    } catch (error: any) {
+      console.error('Error activating subscription with Stripe:', error)
+      return { success: false, data: null, error }
+    }
   }
 }
 
@@ -1178,9 +1313,16 @@ export const aiGeneratedContent = {
     notes?: string
   }) {
     try {
+      // Map camelCase to snake_case for database
+      const dbUpdates: any = {}
+      if (updates.title !== undefined) dbUpdates.title = updates.title
+      if (updates.isFavorite !== undefined) dbUpdates.is_favorite = updates.isFavorite
+      if (updates.tags !== undefined) dbUpdates.tags = updates.tags
+      if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+
       const { data, error } = await supabase
         .from('ai_generated_content')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', contentId)
         .select()
         .single()
@@ -1313,6 +1455,174 @@ export const aiGeneratedContent = {
     } catch (error: any) {
       console.error('Error cleaning up expired content:', error)
       return { data: null, error }
+    }
+  }
+}
+
+// Meta (Facebook/Instagram) Integration
+export const meta = {
+  // Get user's Meta connections
+  async getConnections(userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('meta_connections')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+      
+      return { data: data || [], error }
+    } catch (error: any) {
+      console.error('Error fetching Meta connections:', error)
+      return { data: [], error }
+    }
+  },
+
+  // Save Meta connection after OAuth
+  async saveConnection(userId: string, connectionData: {
+    platform: 'facebook' | 'instagram'
+    access_token: string
+    expires_at?: string
+    refresh_token?: string
+    page_id?: string
+    page_name?: string
+    instagram_account_id?: string
+    instagram_username?: string
+    scope?: string
+  }) {
+    try {
+      const { data, error } = await supabase
+        .from('meta_connections')
+        .upsert({
+          user_id: userId,
+          ...connectionData,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,platform,page_id'
+        })
+        .select()
+        .single()
+      
+      return { data, error }
+    } catch (error: any) {
+      console.error('Error saving Meta connection:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Delete Meta connection
+  async deleteConnection(connectionId: string) {
+    try {
+      const { error } = await supabase
+        .from('meta_connections')
+        .delete()
+        .eq('id', connectionId)
+      
+      return { error }
+    } catch (error: any) {
+      console.error('Error deleting Meta connection:', error)
+      return { error }
+    }
+  },
+
+  // Get scheduled posts
+  async getScheduledPosts(userId: string, filters?: {
+    platform?: 'facebook' | 'instagram'
+    status?: 'scheduled' | 'published' | 'failed' | 'cancelled'
+    startDate?: string
+    endDate?: string
+  }) {
+    try {
+      let query = supabase
+        .from('scheduled_posts')
+        .select('*, meta_connections(*)')
+        .eq('user_id', userId)
+        .order('scheduled_at', { ascending: true })
+
+      if (filters?.platform) {
+        query = query.eq('platform', filters.platform)
+      }
+      if (filters?.status) {
+        query = query.eq('status', filters.status)
+      }
+      if (filters?.startDate) {
+        query = query.gte('scheduled_at', filters.startDate)
+      }
+      if (filters?.endDate) {
+        query = query.lte('scheduled_at', filters.endDate)
+      }
+
+      const { data, error } = await query
+      return { data: data || [], error }
+    } catch (error: any) {
+      console.error('Error fetching scheduled posts:', error)
+      return { data: [], error }
+    }
+  },
+
+  // Schedule a post
+  async schedulePost(userId: string, postData: {
+    meta_connection_id: string
+    platform: 'facebook' | 'instagram'
+    image_url: string
+    caption?: string
+    scheduled_at: string
+  }) {
+    try {
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .insert({
+          user_id: userId,
+          ...postData,
+          status: 'scheduled'
+        })
+        .select()
+        .single()
+      
+      return { data, error }
+    } catch (error: any) {
+      console.error('Error scheduling post:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Update scheduled post status
+  async updatePostStatus(postId: string, status: 'scheduled' | 'published' | 'failed' | 'cancelled', metaPostId?: string, errorMessage?: string) {
+    try {
+      const updateData: any = { status }
+      if (status === 'published' && metaPostId) {
+        updateData.meta_post_id = metaPostId
+        updateData.published_at = new Date().toISOString()
+      }
+      if (status === 'failed' && errorMessage) {
+        updateData.error_message = errorMessage
+      }
+
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .update(updateData)
+        .eq('id', postId)
+        .select()
+        .single()
+      
+      return { data, error }
+    } catch (error: any) {
+      console.error('Error updating post status:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Delete scheduled post
+  async deleteScheduledPost(postId: string) {
+    try {
+      const { error } = await supabase
+        .from('scheduled_posts')
+        .delete()
+        .eq('id', postId)
+      
+      return { error }
+    } catch (error: any) {
+      console.error('Error deleting scheduled post:', error)
+      return { error }
     }
   }
 }

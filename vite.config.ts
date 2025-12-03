@@ -2,12 +2,13 @@ import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-      server: {
-        port: 5454,
-        host: true
-      },
+  const env = loadEnv(mode, '.', '');
+  return {
+    server: {
+      port: 5454,
+      host: true,
+      https: false // Keep HTTP for local development with Meta OAuth
+    },
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)

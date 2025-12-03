@@ -49,10 +49,10 @@ const EditImageNovo: React.FC<EditImageNovoProps> = ({ imageUrl, onBack, onImage
   const [imageHistory, setImageHistory] = useState<string[]>([])
   const [redoHistory, setRedoHistory] = useState<string[]>([])
   
-  // Check if coming from marketing (Instagram/Facebook ad) or dress model
+  // Check if coming from marketing (Instagram/Facebook ad), history-gallery, or dress model
   const previousView = safeLocalStorage.getItem('editImage_previousView')
   const adType = safeLocalStorage.getItem('editImage_adType')
-  const isFromMarketing = previousView === 'marketing' && adType
+  const isFromMarketing = (previousView === 'marketing' || previousView === 'history-gallery') && adType
   
   const [currentImage, setCurrentImage] = useState<string | null>(() => {
     if (isFromMarketing && adType) {
@@ -252,6 +252,8 @@ const EditImageNovo: React.FC<EditImageNovoProps> = ({ imageUrl, onBack, onImage
                 
                 if (previousView === 'marketing' && onNavigate) {
                   onNavigate('marketing')
+                } else if (previousView === 'history-gallery' && onNavigate) {
+                  onNavigate('history-gallery')
                 } else if (onBack) {
                   onBack()
                 }

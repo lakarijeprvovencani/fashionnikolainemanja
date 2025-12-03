@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTokens } from '../contexts/TokenContext'
-import { db, dressedModels } from '../lib/supabase'
+import { db, dressedModels, supabase } from '../lib/supabase'
 import CreateModel from './CreateModel'
 import ViewModels from './ViewModels'
 import DressModel from './DressModel'
@@ -20,6 +20,7 @@ import BrandMemoryMapBanner from './BrandMemoryMapBanner'
 import BrandProfileUpgrade from './BrandProfileUpgrade'
 import HistoryGallery from './HistoryGallery'
 import DashboardNovo from './DashboardNovo'
+import MetaCallback from '../pages/MetaCallback'
 
 interface FashionModel {
   id: string
@@ -74,12 +75,41 @@ const Dashboard: React.FC = () => {
     }
   }, [currentView])
 
-  // Check URL for /novo route
+  // Check URL for /novo route and /meta-callback
   useEffect(() => {
-    if (window.location.pathname === '/novo' || window.location.hash === '#novo') {
-      setCurrentView('novo')
+    const urlParams = new URLSearchParams(window.location.search)
+    const pathname = window.location.pathname
+    const hash = window.location.hash
+
+    // Check for /meta-callback route - render MetaCallback component
+    if (pathname === '/meta-callback') {
+      // MetaCallback component will handle the OAuth callback
+      return
     }
-  }, [])
+
+    // Check for /novo route
+    if (pathname === '/novo' || hash === '#novo') {
+      setCurrentView('novo')
+      return
+    }
+
+    // Check for Meta OAuth callback success - redirect to Content Calendar in new design
+    if (urlParams.get('meta_connected') === 'true') {
+      setCurrentView('novo')
+      // Clean up URL
+      window.history.replaceState({}, '', '/novo')
+      return
+    }
+  }, [user]) // Add user as dependency
+
+  // NOTE: Meta callback handling is done in MetaCallback.tsx page component
+  // Removed duplicate handleMetaCallback() function to prevent double processing
+
+  // Check if we're on /meta-callback route - render MetaCallback component
+  const pathname = window.location.pathname
+  if (pathname === '/meta-callback') {
+    return <MetaCallback />
+  }
 
   if (loading) {
     return (

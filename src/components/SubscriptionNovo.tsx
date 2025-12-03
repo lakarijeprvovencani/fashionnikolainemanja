@@ -249,16 +249,22 @@ const SubscriptionNovo: React.FC<SubscriptionNovoProps> = ({ onBack, onNavigate,
           </div>
           <div style={{
             padding: '8px 20px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: tokenData.status === 'cancelled' || tokenData.plan_type === 'free'
+              ? 'rgba(255,255,255,0.1)'
+              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             color: '#fff',
             fontSize: '12px',
             fontWeight: '600',
             textTransform: 'uppercase',
             letterSpacing: '1px',
             borderRadius: '20px',
-            boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+            boxShadow: tokenData.status === 'cancelled' || tokenData.plan_type === 'free'
+              ? 'none'
+              : '0 4px 12px rgba(102, 126, 234, 0.3)'
           }}>
-            {getPlanDisplayName(tokenData.plan_type)}
+            {tokenData.status === 'cancelled' || tokenData.plan_type === 'free' 
+              ? 'Free' 
+              : getPlanDisplayName(tokenData.plan_type)}
           </div>
         </div>
 

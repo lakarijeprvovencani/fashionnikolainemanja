@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { subscriptions } from '../lib/supabase'
 import PageHeader from './PageHeader'
 
 interface BrandProfileUpgradeProps {
@@ -20,29 +21,57 @@ const BrandProfileUpgrade: React.FC<BrandProfileUpgradeProps> = ({ onBack, onNav
     }
   }, [user])
 
+  const [loading, setLoading] = useState(false)
+
   const handleSubscribe = async () => {
     if (!user) {
       alert('Please log in to subscribe')
       return
     }
 
-    // TODO: Integrate with Stripe for $9/month add-on subscription
-    // For now, increment in localStorage (demo mode)
-    const currentCount = currentAdditionalProfiles
-    const newCount = currentCount + 1
-    localStorage.setItem(`brand_profiles_additional_${user.id}`, newCount.toString())
-    setCurrentAdditionalProfiles(newCount)
-    
-    alert(`🎉 Brand Profile Upgrade activated! (Demo Mode)\n\nYou can now create ${2 + newCount} brand profiles total.\n\nIn production, this will integrate with Stripe for $9/month per additional profile.`)
-    
-    // Trigger window event to refresh BrandMemoryMap
-    window.dispatchEvent(new Event('brand-profiles-updated'))
-    
-    if (onSuccess) {
-      onSuccess()
-    }
-    if (onBack) {
-      onBack()
+    setLoading(true)
+    try {
+      // Check if Stripe is configured (check for environment variable)
+      const isStripeConfigured = import.meta.env.VITE_STRIPE_PUBLIC_KEY
+
+      if (isStripeConfigured) {
+        // Use Stripe checkout
+        // Note: You'll need to create a Stripe product/price for additional profiles
+        // For now, this is a placeholder - you'll need to add the plan ID
+        const { data, error } = await subscriptions.createCheckoutSession('monthly') // Replace with actual plan ID for additional profiles
+        
+        if (error) {
+          throw error
+        }
+
+        if (data?.url) {
+          // Redirect to Stripe checkout
+          window.location.href = data.url
+        }
+      } else {
+        // Demo mode - fallback if Stripe not configured
+        const currentCount = currentAdditionalProfiles
+        const newCount = currentCount + 1
+        localStorage.setItem(`brand_profiles_additional_${user.id}`, newCount.toString())
+        setCurrentAdditionalProfiles(newCount)
+        
+        alert(`🎉 Brand Profile Upgrade activated! (Demo Mode)\n\nYou can now create ${2 + newCount} brand profiles total.\n\nStripe integration will be enabled once API keys are configured.`)
+        
+        // Trigger window event to refresh BrandMemoryMap
+        window.dispatchEvent(new Event('brand-profiles-updated'))
+        
+        if (onSuccess) {
+          onSuccess()
+        }
+        if (onBack) {
+          onBack()
+        }
+      }
+    } catch (error: any) {
+      console.error('Error subscribing:', error)
+      alert('❌ Failed to start checkout: ' + error.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -253,6 +282,7 @@ const BrandProfileUpgrade: React.FC<BrandProfileUpgradeProps> = ({ onBack, onNav
           {/* Subscribe Button */}
           <button
             onClick={handleSubscribe}
+            disabled={loading}
             style={{
               width: '100%',
               padding: '18px',
@@ -279,7 +309,7 @@ const BrandProfileUpgrade: React.FC<BrandProfileUpgradeProps> = ({ onBack, onNav
               e.currentTarget.style.boxShadow = '0 4px 12px rgba(31, 41, 55, 0.3)'
             }}
           >
-            Subscribe - $9/month
+            {loading ? 'Loading...' : 'Subscribe - $9/month'}
           </button>
 
           <p style={{

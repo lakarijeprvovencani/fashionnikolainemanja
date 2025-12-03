@@ -29,7 +29,7 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
   const [content, setContent] = useState<AIContent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [filter, setFilter] = useState<'all' | 'model' | 'dressed_model' | 'caption' | 'image' | 'video' | 'favorites'>('all')
+  const [filter, setFilter] = useState<'all' | 'dressed_model' | 'instagram_ad' | 'facebook_ad' | 'video' | 'favorites'>('all')
   const [selectedContent, setSelectedContent] = useState<AIContent | null>(null)
 
   useEffect(() => {
@@ -50,30 +50,51 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
 
       if (filter === 'favorites') {
         favoritesOnly = true
-      } else if (filter === 'model') {
-        contentType = 'model'
-      } else if (filter === 'dressed_model') {
-        contentType = 'dressed_model'
-      } else if (filter === 'caption') {
-        const { data: instagram } = await aiGeneratedContent.getUserContent(user.id, { contentType: 'caption_instagram' })
-        const { data: webshop } = await aiGeneratedContent.getUserContent(user.id, { contentType: 'caption_webshop' })
-        const { data: facebook } = await aiGeneratedContent.getUserContent(user.id, { contentType: 'caption_facebook' })
-        const { data: email } = await aiGeneratedContent.getUserContent(user.id, { contentType: 'caption_email' })
+        // For favorites, get all relevant content types in parallel
+        const [dressedModelResult, instagramAdResult, facebookAdResult, videoResult] = await Promise.all([
+          aiGeneratedContent.getUserContent(user.id, { contentType: 'dressed_model', favoritesOnly: true }),
+          aiGeneratedContent.getUserContent(user.id, { contentType: 'instagram_ad', favoritesOnly: true }),
+          aiGeneratedContent.getUserContent(user.id, { contentType: 'facebook_ad', favoritesOnly: true }),
+          aiGeneratedContent.getUserContent(user.id, { contentType: 'generated_video', favoritesOnly: true })
+        ])
         
-        const allCaptions = [
-          ...(instagram || []),
-          ...(webshop || []),
-          ...(facebook || []),
-          ...(email || [])
+        const allFavorites = [
+          ...(dressedModelResult.data || []),
+          ...(instagramAdResult.data || []),
+          ...(facebookAdResult.data || []),
+          ...(videoResult.data || [])
         ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         
-        setContent(allCaptions as AIContent[])
+        setContent(allFavorites as AIContent[])
         setLoading(false)
         return
-      } else if (filter === 'image') {
-        contentType = 'generated_image'
+      } else if (filter === 'dressed_model') {
+        contentType = 'dressed_model'
+      } else if (filter === 'instagram_ad') {
+        contentType = 'instagram_ad'
+      } else if (filter === 'facebook_ad') {
+        contentType = 'facebook_ad'
       } else if (filter === 'video') {
         contentType = 'generated_video'
+      } else if (filter === 'all') {
+        // For 'all', get all relevant content types in parallel
+        const [dressedModelResult, instagramAdResult, facebookAdResult, videoResult] = await Promise.all([
+          aiGeneratedContent.getUserContent(user.id, { contentType: 'dressed_model' }),
+          aiGeneratedContent.getUserContent(user.id, { contentType: 'instagram_ad' }),
+          aiGeneratedContent.getUserContent(user.id, { contentType: 'facebook_ad' }),
+          aiGeneratedContent.getUserContent(user.id, { contentType: 'generated_video' })
+        ])
+        
+        const allContent = [
+          ...(dressedModelResult.data || []),
+          ...(instagramAdResult.data || []),
+          ...(facebookAdResult.data || []),
+          ...(videoResult.data || [])
+        ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        
+        setContent(allContent as AIContent[])
+        setLoading(false)
+        return
       }
 
       const { data, error } = await aiGeneratedContent.getUserContent(user.id, {
@@ -93,15 +114,26 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
   }
 
   const toggleFavorite = async (contentId: string, currentFavorite: boolean) => {
-    if (!user) return
+    if (!user) {
+      console.error('No user found')
+      return
+    }
+    
+    console.log('Toggling favorite for content:', contentId, 'Current:', currentFavorite)
     
     try {
-      const { error } = await aiGeneratedContent.updateContent(contentId, {
+      const { data, error } = await aiGeneratedContent.updateContent(contentId, {
         isFavorite: !currentFavorite
       })
       
-      if (error) throw error
+      if (error) {
+        console.error('Error from updateContent:', error)
+        throw error
+      }
       
+      console.log('Successfully updated favorite:', data)
+      
+      // Update local state
       setContent(prev => prev.map(item => 
         item.id === contentId 
           ? { ...item, is_favorite: !currentFavorite }
@@ -109,6 +141,9 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
       ))
     } catch (err: any) {
       console.error('Error toggling favorite:', err)
+      setError(err.message || 'Failed to update favorite. Please try again.')
+      // Show error temporarily
+      setTimeout(() => setError(''), 3000)
     }
   }
 
@@ -128,25 +163,65 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
     }
   }
 
+  const handleEditImage = (item: AIContent) => {
+    if (!item.image_url) {
+      setError('No image available to edit')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
+
+    // Determine where to navigate based on content type
+    if (item.content_type === 'dressed_model') {
+      // Save image for dress-model edit
+      localStorage.setItem('dressModel_generatedImage', item.image_url)
+      localStorage.setItem('editImage_previousView', 'history-gallery')
+      localStorage.removeItem('editImage_adType')
+      if (onNavigate) {
+        onNavigate('edit-image')
+      }
+    } else if (item.content_type === 'instagram_ad') {
+      // Save image for instagram ad edit
+      localStorage.setItem('instagram_ad_editImage', item.image_url)
+      localStorage.setItem('instagram_ad_generated', item.image_url)
+      localStorage.setItem('editImage_previousView', 'history-gallery')
+      localStorage.setItem('editImage_adType', 'instagram')
+      if (onNavigate) {
+        onNavigate('edit-image')
+      }
+    } else if (item.content_type === 'facebook_ad') {
+      // Save image for facebook ad edit
+      localStorage.setItem('facebook_ad_editImage', item.image_url)
+      localStorage.setItem('facebook_ad_generated', item.image_url)
+      localStorage.setItem('editImage_previousView', 'history-gallery')
+      localStorage.setItem('editImage_adType', 'facebook')
+      if (onNavigate) {
+        onNavigate('edit-image')
+      }
+    } else {
+      // For other types, default to dress-model edit
+      localStorage.setItem('dressModel_generatedImage', item.image_url)
+      localStorage.setItem('editImage_previousView', 'history-gallery')
+      localStorage.removeItem('editImage_adType')
+      if (onNavigate) {
+        onNavigate('edit-image')
+      }
+    }
+  }
+
   const getContentTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      'model': 'Model',
       'dressed_model': 'Dressed Model',
-      'caption_instagram': 'Instagram Caption',
-      'caption_webshop': 'Webshop Caption',
-      'caption_facebook': 'Facebook Caption',
-      'caption_email': 'Email Caption',
-      'generated_image': 'Generated Image',
-      'generated_video': 'Generated Video',
-      'edited_image': 'Edited Image'
+      'instagram_ad': 'Instagram Ad',
+      'facebook_ad': 'Facebook Ad',
+      'generated_video': 'Video'
     }
     return labels[type] || type
   }
 
   const getContentTypeIcon = (type: string) => {
-    if (type.startsWith('caption_')) return '📝'
-    if (type === 'model' || type === 'dressed_model') return '👤'
-    if (type === 'generated_image' || type === 'edited_image') return '🖼️'
+    if (type === 'dressed_model') return '👤'
+    if (type === 'instagram_ad') return '📷'
+    if (type === 'facebook_ad') return '📘'
     if (type === 'generated_video') return '🎥'
     return '📄'
   }
@@ -179,17 +254,53 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
+        flexDirection: 'column',
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
+        gap: '20px'
       }}>
         <div style={{
-          width: '40px',
-          height: '40px',
-          border: '3px solid rgba(255,255,255,0.1)',
-          borderTopColor: '#667eea',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(45, 20, 20, 0.6) 50%, rgba(20, 10, 10, 0.9) 100%)',
+          backdropFilter: 'blur(30px)',
+          WebkitBackdropFilter: 'blur(30px)',
+          zIndex: 0
         }}></div>
+        <div style={{
+          position: 'relative',
+          zIndex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '20px'
+        }}>
+          <div style={{
+            width: '50px',
+            height: '50px',
+            border: '4px solid rgba(255,255,255,0.1)',
+            borderTopColor: '#667eea',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <div style={{
+            fontSize: '16px',
+            fontWeight: '600',
+            color: 'rgba(255,255,255,0.9)',
+            letterSpacing: '0.5px'
+          }}>
+            Loading your creations...
+          </div>
+          <div style={{
+            fontSize: '13px',
+            color: 'rgba(255,255,255,0.6)'
+          }}>
+            Please wait while we fetch your content
+          </div>
+        </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
@@ -209,6 +320,32 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
       position: 'relative',
       overflow: 'hidden'
     }}>
+      <style>{`
+        /* Mobile: Dynamic height based on image */
+        @media (max-width: 768px) {
+          .image-container-responsive {
+            height: auto !important;
+            aspect-ratio: 3/4;
+            max-height: 400px;
+          }
+          .image-container-responsive img {
+            width: auto !important;
+            height: auto !important;
+            max-width: 100%;
+            max-height: 100%;
+          }
+        }
+        /* Desktop: Fixed height */
+        @media (min-width: 769px) {
+          .image-container-responsive {
+            height: 200px;
+          }
+          .image-container-responsive img {
+            width: 100%;
+            height: 100%;
+          }
+        }
+      `}</style>
       {/* Dark Overlay */}
       <div style={{
         position: 'absolute',
@@ -260,7 +397,7 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
           marginBottom: '32px',
           flexWrap: 'wrap'
         }}>
-          {(['all', 'model', 'dressed_model', 'caption', 'image', 'video', 'favorites'] as const).map((filterType) => (
+          {(['all', 'dressed_model', 'instagram_ad', 'facebook_ad', 'video', 'favorites'] as const).map((filterType) => (
             <button
               key={filterType}
               onClick={() => setFilter(filterType)}
@@ -294,6 +431,10 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
             >
               {filterType === 'all' ? 'All Content' : 
                filterType === 'favorites' ? '⭐ Favorites' :
+               filterType === 'dressed_model' ? 'Dressed Model' :
+               filterType === 'instagram_ad' ? 'Instagram Ad' :
+               filterType === 'facebook_ad' ? 'Facebook Ad' :
+               filterType === 'video' ? 'Video' :
                filterType.replace('_', ' ')}
             </button>
           ))}
@@ -338,8 +479,9 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: '24px'
+            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+            gap: '20px',
+            alignItems: 'start'
           }}>
             {content.map((item) => (
               <div
@@ -366,25 +508,6 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
                 }}
                 onClick={() => setSelectedContent(item)}
               >
-                {item.is_favorite && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '12px',
-                    right: '12px',
-                    background: 'rgba(0, 0, 0, 0.6)',
-                    borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 2,
-                    backdropFilter: 'blur(10px)'
-                  }}>
-                    <span style={{ fontSize: '18px' }}>⭐</span>
-                  </div>
-                )}
-
                 {item.image_url && (
                   <div style={{
                     width: '100%',
@@ -393,17 +516,77 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    overflow: 'hidden'
-                  }}>
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }}
+                  className="image-container-responsive"
+                  >
                     <img
                       src={item.image_url}
                       alt={item.title || 'Generated content'}
                       style={{
                         width: '100%',
                         height: '100%',
-                        objectFit: 'cover'
+                        objectFit: 'contain'
                       }}
                     />
+                    {/* Heart icon in top-right corner */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (!item.id) {
+                          console.error('Content item has no ID:', item)
+                          setError('This content cannot be favorited. It may not be saved yet.')
+                          setTimeout(() => setError(''), 3000)
+                          return
+                        }
+                        toggleFavorite(item.id, item.is_favorite || false)
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        background: item.is_favorite 
+                          ? 'rgba(239, 68, 68, 0.9)' 
+                          : 'rgba(0, 0, 0, 0.6)',
+                        borderRadius: '50%',
+                        width: '36px',
+                        height: '36px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 2,
+                        backdropFilter: 'blur(10px)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.1)'
+                        e.currentTarget.style.background = item.is_favorite 
+                          ? 'rgba(239, 68, 68, 1)' 
+                          : 'rgba(0, 0, 0, 0.8)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)'
+                        e.currentTarget.style.background = item.is_favorite 
+                          ? 'rgba(239, 68, 68, 0.9)' 
+                          : 'rgba(0, 0, 0, 0.6)'
+                      }}
+                    >
+                      <svg 
+                        width="20" 
+                        height="20" 
+                        viewBox="0 0 24 24" 
+                        fill={item.is_favorite ? "currentColor" : "none"} 
+                        stroke="currentColor" 
+                        strokeWidth="2"
+                        style={{ color: '#fff' }}
+                      >
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                      </svg>
+                    </button>
                   </div>
                 )}
 
@@ -472,31 +655,61 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          toggleFavorite(item.id, item.is_favorite)
+                          handleEditImage(item)
                         }}
                         style={{
                           padding: '6px',
-                          background: 'rgba(255,255,255,0.1)',
+                          background: 'rgba(102, 126, 234, 0.2)',
                           border: 'none',
                           borderRadius: '8px',
                           cursor: 'pointer',
-                          fontSize: '18px',
-                          opacity: item.is_favorite ? 1 : 0.5,
                           transition: 'all 0.2s',
                           backdropFilter: 'blur(10px)'
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '1'
-                          e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
+                          e.currentTarget.style.background = 'rgba(102, 126, 234, 0.3)'
                         }}
                         onMouseLeave={(e) => {
-                          if (!item.is_favorite) {
-                            e.currentTarget.style.opacity = '0.5'
-                          }
-                          e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
+                          e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
                         }}
                       >
-                        ⭐
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (!item.image_url) return
+                          const link = document.createElement('a')
+                          link.href = item.image_url
+                          link.download = `${item.content_type}-${item.id || Date.now()}.png`
+                          document.body.appendChild(link)
+                          link.click()
+                          document.body.removeChild(link)
+                        }}
+                        style={{
+                          padding: '6px',
+                          background: 'rgba(102, 126, 234, 0.2)',
+                          border: 'none',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          backdropFilter: 'blur(10px)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(102, 126, 234, 0.3)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                          <polyline points="7 10 12 15 17 10"></polyline>
+                          <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
                       </button>
                       <button
                         onClick={(e) => {
@@ -543,62 +756,200 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0,0,0,0.9)',
+            background: 'rgba(0,0,0,0.95)',
             zIndex: 2000,
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '40px',
+            padding: '20px',
             cursor: 'zoom-out',
-            backdropFilter: 'blur(20px)'
+            backdropFilter: 'blur(20px)',
+            overflow: 'hidden'
           }}
         >
           <div 
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: 'rgba(0, 0, 0, 0.6)',
+              background: 'rgba(0, 0, 0, 0.8)',
               borderRadius: '24px',
-              padding: '32px',
-              maxWidth: '600px',
-              maxHeight: '90vh',
-              overflow: 'auto',
               border: '1px solid rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(20px)'
+              backdropFilter: 'blur(20px)',
+              display: 'flex',
+              flexDirection: 'column',
+              width: '100%',
+              maxWidth: '900px',
+              maxHeight: '95vh',
+              overflow: 'hidden'
             }}
           >
+            {/* Image Container - Takes most of the space */}
             {selectedContent.image_url && (
-              <img 
-                src={selectedContent.image_url} 
-                alt={selectedContent.title || 'Content'} 
-                style={{
-                  width: '100%',
-                  borderRadius: '16px',
-                  marginBottom: '20px'
-                }}
-              />
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px',
+                minHeight: 0,
+                overflow: 'hidden',
+                background: 'rgba(0, 0, 0, 0.3)'
+              }}>
+                <img 
+                  src={selectedContent.image_url} 
+                  alt={selectedContent.title || 'Content'} 
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: 'calc(95vh - 200px)',
+                    width: 'auto',
+                    height: 'auto',
+                    borderRadius: '16px',
+                    objectFit: 'contain'
+                  }}
+                />
+              </div>
             )}
-            <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '12px' }}>
-              {selectedContent.title || getContentTypeLabel(selectedContent.content_type)}
-            </h2>
-            {selectedContent.prompt && (
-              <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: '16px', lineHeight: '1.6' }}>
-                {selectedContent.prompt}
-              </p>
-            )}
-            <button
-              onClick={() => setSelectedContent(null)}
-              style={{
-                padding: '12px 24px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: '600'
-              }}
-            >
-              Close
-            </button>
+
+            {/* Content Info and Actions - Fixed at bottom */}
+            <div style={{
+              padding: '24px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+              background: 'rgba(0, 0, 0, 0.6)',
+              flexShrink: 0
+            }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>
+                {selectedContent.title || getContentTypeLabel(selectedContent.content_type)}
+              </h2>
+              {selectedContent.prompt && (
+                <p style={{ 
+                  color: 'rgba(255,255,255,0.7)', 
+                  marginBottom: '20px', 
+                  lineHeight: '1.6',
+                  fontSize: '14px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical'
+                }}>
+                  {selectedContent.prompt}
+                </p>
+              )}
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleEditImage(selectedContent)
+                    setSelectedContent(null)
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'rgba(102, 126, 234, 0.2)',
+                    color: '#fff',
+                    border: '1px solid rgba(102, 126, 234, 0.3)',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s',
+                    backdropFilter: 'blur(10px)',
+                    flex: 1,
+                    minWidth: '140px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(102, 126, 234, 0.3)'
+                    e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
+                    e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                  Edit Image
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!selectedContent.image_url) return
+                    const link = document.createElement('a')
+                    link.href = selectedContent.image_url
+                    link.download = `${selectedContent.content_type}-${selectedContent.id || Date.now()}.png`
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'rgba(102, 126, 234, 0.2)',
+                    color: '#fff',
+                    border: '1px solid rgba(102, 126, 234, 0.3)',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s',
+                    backdropFilter: 'blur(10px)',
+                    flex: 1,
+                    minWidth: '140px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(102, 126, 234, 0.3)'
+                    e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
+                    e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Download
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSelectedContent(null)
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    transition: 'all 0.2s',
+                    flex: 1,
+                    minWidth: '140px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

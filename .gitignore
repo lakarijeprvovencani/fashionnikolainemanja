@@ -1,9 +1,29 @@
+# Environment variables
 .env
 .env.local
 .env*.local
+.env.production
+.env.development
+
+# Dependencies
 node_modules
 node_modules/.vite
 node_modules/.package-lock.json
+
+# Build outputs
 dist
+build
 *.log
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Supabase
+.supabase

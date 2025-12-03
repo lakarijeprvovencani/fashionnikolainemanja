@@ -1,14 +1,20 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { meta, supabase } from '../lib/supabase'
 
 interface ScheduledPost {
   id: string
-  imageUrl: string
+  image_url: string
   caption: string
   platform: 'facebook' | 'instagram'
-  scheduledAt: Date
+  scheduled_at: string | Date
   status: 'scheduled' | 'published' | 'failed' | 'cancelled'
-  createdAt: Date
+  created_at: string | Date
+  meta_connection_id?: string
+  meta_connections?: {
+    page_name?: string
+    instagram_username?: string
+  }
 }
 
 interface ContentCalendarNovoProps {
@@ -22,69 +28,83 @@ const ContentCalendarNovo: React.FC<ContentCalendarNovoProps> = ({ onBack, onNav
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null)
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([])
+  const [metaConnections, setMetaConnections] = useState<any[]>([])
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [scheduleImageUrl, setScheduleImageUrl] = useState('')
   const [scheduleCaption, setScheduleCaption] = useState('')
   const [schedulePlatform, setSchedulePlatform] = useState<'facebook' | 'instagram'>('instagram')
   const [scheduleTime, setScheduleTime] = useState('12:00')
+  const [scheduleConnectionId, setScheduleConnectionId] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [scheduling, setScheduling] = useState(false)
+  const [showConnectionsDropdown, setShowConnectionsDropdown] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem('scheduled_posts_mock')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        setScheduledPosts(parsed.map((p: any) => ({
-          ...p,
-          scheduledAt: new Date(p.scheduledAt),
-          createdAt: new Date(p.createdAt)
-        })))
-      } catch (e) {
-        console.error('Error loading scheduled posts:', e)
-        generateMockData()
-      }
-    } else {
-      generateMockData()
+    if (user) {
+      loadData()
+    }
+  }, [user])
+
+  useEffect(() => {
+    // Check if redirected from Meta OAuth
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('meta_connected') === 'true') {
+      loadData()
     }
   }, [])
 
-  const generateMockData = () => {
-    const mockPosts: ScheduledPost[] = [
-      {
-        id: '1',
-        imageUrl: 'https://via.placeholder.com/300x300?text=Summer+Collection',
-        caption: 'Check out our new summer collection! 🌞',
-        platform: 'instagram',
-        scheduledAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-        status: 'scheduled',
-        createdAt: new Date()
-      },
-      {
-        id: '2',
-        imageUrl: 'https://via.placeholder.com/300x300?text=New+Arrivals',
-        caption: 'New arrivals just dropped! Shop now.',
-        platform: 'facebook',
-        scheduledAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-        status: 'scheduled',
-        createdAt: new Date()
-      },
-      {
-        id: '3',
-        imageUrl: 'https://via.placeholder.com/300x300?text=Sale+50%25+Off',
-        caption: 'Limited time offer - 50% off everything!',
-        platform: 'instagram',
-        scheduledAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-        status: 'scheduled',
-        createdAt: new Date()
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (showConnectionsDropdown && !target.closest('[data-connections-dropdown]')) {
+        setShowConnectionsDropdown(false)
       }
-    ]
-    setScheduledPosts(mockPosts)
-    localStorage.setItem('scheduled_posts_mock', JSON.stringify(mockPosts))
+    }
+
+    if (showConnectionsDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [showConnectionsDropdown])
+
+  const loadData = async () => {
+    if (!user) return
+    
+    setLoading(true)
+    try {
+      // Load Meta connections
+      const { data: connections, error: connError } = await meta.getConnections(user.id)
+      if (connError) console.error('Error loading connections:', connError)
+      setMetaConnections(connections || [])
+
+      // Load scheduled posts
+      const { data: posts, error: postsError } = await meta.getScheduledPosts(user.id)
+      if (postsError) console.error('Error loading posts:', postsError)
+      
+      // Transform posts to match interface
+      const transformedPosts = (posts || []).map((p: any) => ({
+        id: p.id,
+        image_url: p.image_url,
+        caption: p.caption || '',
+        platform: p.platform,
+        scheduled_at: new Date(p.scheduled_at),
+        status: p.status,
+        created_at: new Date(p.created_at),
+        meta_connection_id: p.meta_connection_id,
+        meta_connections: p.meta_connections
+      }))
+      
+      setScheduledPosts(transformedPosts)
+    } catch (error: any) {
+      console.error('Error loading data:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const savePosts = (posts: ScheduledPost[]) => {
-    setScheduledPosts(posts)
-    localStorage.setItem('scheduled_posts_mock', JSON.stringify(posts))
-  }
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear()
@@ -99,13 +119,14 @@ const ContentCalendarNovo: React.FC<ContentCalendarNovoProps> = ({ onBack, onNav
 
   const getPostsForDate = (date: Date) => {
     return scheduledPosts.filter(post => {
-      const postDate = new Date(post.scheduledAt)
+      const postDate = new Date(post.scheduled_at)
       return postDate.toDateString() === date.toDateString()
     })
   }
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  const formatTime = (date: Date | string) => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    return dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   }
 
   const navigateMonth = (direction: 'prev' | 'next') => {
@@ -114,31 +135,48 @@ const ContentCalendarNovo: React.FC<ContentCalendarNovoProps> = ({ onBack, onNav
     setCurrentDate(newDate)
   }
 
-  const handleDeletePost = (postId: string) => {
-    const updated = scheduledPosts.filter(p => p.id !== postId)
-    savePosts(updated)
-    setSelectedPost(null)
+  const handleDeletePost = async (postId: string) => {
+    if (!confirm('Are you sure you want to delete this scheduled post?')) return
+
+    try {
+      const { error } = await meta.deleteScheduledPost(postId)
+      if (error) throw error
+      
+      await loadData()
+      setSelectedPost(null)
+    } catch (error: any) {
+      console.error('Error deleting post:', error)
+      alert('Failed to delete post: ' + error.message)
+    }
   }
 
   const handleDragStart = (e: React.DragEvent, post: ScheduledPost) => {
     e.dataTransfer.setData('postId', post.id)
   }
 
-  const handleDrop = (e: React.DragEvent, targetDate: Date) => {
+  const handleDrop = async (e: React.DragEvent, targetDate: Date) => {
     e.preventDefault()
     e.stopPropagation()
     const postId = e.dataTransfer.getData('postId')
     const post = scheduledPosts.find(p => p.id === postId)
     if (post) {
       const newDate = new Date(targetDate)
-      newDate.setHours(post.scheduledAt.getHours(), post.scheduledAt.getMinutes(), 0, 0)
+      const oldDate = new Date(post.scheduled_at)
+      newDate.setHours(oldDate.getHours(), oldDate.getMinutes(), 0, 0)
       
-      const updated = scheduledPosts.map(p => 
-        p.id === postId 
-          ? { ...p, scheduledAt: newDate }
-          : p
-      )
-      savePosts(updated)
+      try {
+        // Update in database
+        const { error } = await supabase
+          .from('scheduled_posts')
+          .update({ scheduled_at: newDate.toISOString() })
+          .eq('id', postId)
+        
+        if (error) throw error
+        await loadData()
+      } catch (error: any) {
+        console.error('Error updating post:', error)
+        alert('Failed to reschedule post: ' + error.message)
+      }
     }
   }
 
@@ -146,30 +184,80 @@ const ContentCalendarNovo: React.FC<ContentCalendarNovoProps> = ({ onBack, onNav
     e.preventDefault()
   }
 
-  const handleSchedulePost = () => {
-    if (!scheduleImageUrl || !selectedDate) return
-
-    const [hours, minutes] = scheduleTime.split(':').map(Number)
-    const scheduledDateTime = new Date(selectedDate)
-    scheduledDateTime.setHours(hours, minutes, 0, 0)
-    
-    const newPost: ScheduledPost = {
-      id: `post-${Date.now()}`,
-      imageUrl: scheduleImageUrl,
-      caption: scheduleCaption || 'No caption',
-      platform: schedulePlatform,
-      scheduledAt: scheduledDateTime,
-      status: 'scheduled',
-      createdAt: new Date()
+  const handleSchedulePost = async () => {
+    if (!scheduleImageUrl || !selectedDate || !scheduleConnectionId || !user) {
+      alert('Please fill in all required fields')
+      return
     }
 
-    const updatedPosts = [...scheduledPosts, newPost]
-    savePosts(updatedPosts)
-    
-    setShowScheduleModal(false)
-    setScheduleImageUrl('')
-    setScheduleCaption('')
-    setScheduleTime('12:00')
+    setScheduling(true)
+    try {
+      const [hours, minutes] = scheduleTime.split(':').map(Number)
+      const scheduledDateTime = new Date(selectedDate)
+      scheduledDateTime.setHours(hours, minutes, 0, 0)
+
+      // First, save to database
+      const { data: savedPost, error: saveError } = await meta.schedulePost(user.id, {
+        meta_connection_id: scheduleConnectionId,
+        platform: schedulePlatform,
+        image_url: scheduleImageUrl,
+        caption: scheduleCaption || '',
+        scheduled_at: scheduledDateTime.toISOString()
+      })
+
+      if (saveError) throw saveError
+
+      // Then, schedule via Meta API
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not authenticated')
+
+      const scheduleResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-schedule-post`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+          },
+          body: JSON.stringify({
+            connectionId: scheduleConnectionId,
+            imageUrl: scheduleImageUrl,
+            caption: scheduleCaption || '',
+            scheduledAt: scheduledDateTime.toISOString(),
+            platform: schedulePlatform
+          })
+        }
+      )
+
+      if (!scheduleResponse.ok) {
+        const errorData = await scheduleResponse.json()
+        throw new Error(errorData.error || 'Failed to schedule post')
+      }
+
+      const scheduleData = await scheduleResponse.json()
+
+      // Update post with Meta post ID if available
+      if (scheduleData.post_id && savedPost) {
+        await meta.updatePostStatus(savedPost.id, 'scheduled', scheduleData.post_id)
+      }
+
+      await loadData()
+      
+      setShowScheduleModal(false)
+      setScheduleImageUrl('')
+      setScheduleCaption('')
+      setScheduleTime('12:00')
+      setScheduleConnectionId('')
+      setSelectedDate(null)
+      
+      alert('Post scheduled successfully!')
+    } catch (error: any) {
+      console.error('Error scheduling post:', error)
+      alert('Failed to schedule post: ' + error.message)
+    } finally {
+      setScheduling(false)
+    }
   }
 
   const { daysInMonth, startingDayOfWeek, year, month } = getDaysInMonth(currentDate)
@@ -181,6 +269,51 @@ const ContentCalendarNovo: React.FC<ContentCalendarNovoProps> = ({ onBack, onNav
   }
   for (let day = 1; day <= daysInMonth; day++) {
     days.push(new Date(year, month, day))
+  }
+
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        width: '100%',
+        background: '#1a1a1a',
+        backgroundImage: `url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif',
+        color: '#ffffff',
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(45, 20, 20, 0.6) 50%, rgba(20, 10, 10, 0.9) 100%)',
+          backdropFilter: 'blur(30px)',
+          WebkitBackdropFilter: 'blur(30px)',
+          zIndex: 0
+        }}></div>
+        <div style={{ textAlign: 'center', padding: '40px', position: 'relative', zIndex: 1 }}>
+          <div style={{
+            width: '50px',
+            height: '50px',
+            border: '4px solid rgba(255,255,255,0.1)',
+            borderTopColor: '#667eea',
+            borderRadius: '50%',
+            margin: '0 auto 24px',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <p style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Loading calendar...</p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -251,6 +384,211 @@ const ContentCalendarNovo: React.FC<ContentCalendarNovoProps> = ({ onBack, onNav
               <h1 style={{ fontSize: '28px', fontWeight: '700', margin: 0, letterSpacing: '-0.5px' }}>Content Calendar</h1>
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', margin: '4px 0 0 0' }}>Schedule and manage your posts</p>
             </div>
+          </div>
+          <div>
+            {metaConnections.length === 0 ? (
+              <button
+                onClick={() => {
+                  if (onNavigate) {
+                    onNavigate('meta-connect')
+                  }
+                }}
+                style={{
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              >
+                Connect Meta Account
+              </button>
+            ) : (
+              <div style={{ position: 'relative' }} data-connections-dropdown>
+                <button
+                  onClick={() => setShowConnectionsDropdown(!showConnectionsDropdown)}
+                  style={{
+                    padding: '12px 20px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: '#fff',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                  }}
+                >
+                  <span>{metaConnections.length} account{metaConnections.length !== 1 ? 's' : ''} connected</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 9l6 6 6-6"/>
+                  </svg>
+                </button>
+                
+                {showConnectionsDropdown && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '8px',
+                    background: 'rgba(0, 0, 0, 0.9)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '16px',
+                    padding: '12px',
+                    minWidth: '300px',
+                    zIndex: 1000,
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+                  }}>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.6)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Connected Accounts
+                    </div>
+                    {metaConnections.map((connection) => (
+                      <div
+                        key={connection.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '12px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: '12px',
+                          marginBottom: '8px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            background: connection.platform === 'facebook' 
+                              ? 'linear-gradient(135deg, #1877F2 0%, #0D5FDB 100%)'
+                              : 'linear-gradient(135deg, #E4405F 0%, #C13584 50%, #833AB4 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#fff',
+                            fontSize: '16px'
+                          }}>
+                            {connection.platform === 'facebook' ? '📘' : '📷'}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#fff', marginBottom: '2px' }}>
+                              {connection.page_name || connection.instagram_username || `${connection.platform} Account`}
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', textTransform: 'capitalize' }}>
+                              {connection.platform === 'instagram' ? (
+                                <>
+                                  Instagram Business Account
+                                  {connection.instagram_username && ` • @${connection.instagram_username}`}
+                                  {connection.page_name && ` • via ${connection.page_name}`}
+                                </>
+                              ) : (
+                                <>
+                                  {connection.page_name ? 'Facebook Page' : 'Facebook Personal Account'}
+                                  {connection.scope === 'public_profile' && ' • Basic Access'}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (confirm(`Are you sure you want to disconnect ${connection.page_name || connection.instagram_username || connection.platform}?`)) {
+                              try {
+                                const { error } = await meta.deleteConnection(connection.id)
+                                if (error) throw error
+                                await loadData() // Reload connections
+                                setShowConnectionsDropdown(false)
+                              } catch (error: any) {
+                                console.error('Error disconnecting:', error)
+                                alert('Failed to disconnect: ' + error.message)
+                              }
+                            }
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            background: 'rgba(239, 68, 68, 0.2)',
+                            color: '#ef4444',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)'
+                            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.5)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'
+                            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)'
+                          }}
+                        >
+                          Disconnect
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => {
+                        if (onNavigate) {
+                          onNavigate('meta-connect')
+                        }
+                        setShowConnectionsDropdown(false)
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        background: 'rgba(102, 126, 234, 0.2)',
+                        color: '#667eea',
+                        border: '1px solid rgba(102, 126, 234, 0.3)',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        marginTop: '8px',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.3)'
+                        e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
+                        e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
+                      }}
+                    >
+                      + Connect Another Account
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -447,7 +785,7 @@ const ContentCalendarNovo: React.FC<ContentCalendarNovoProps> = ({ onBack, onNav
                         >
                           <span>{post.platform === 'instagram' ? '📷' : '👤'}</span>
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {formatTime(post.scheduledAt)}
+                            {formatTime(post.scheduled_at)}
                           </span>
                         </div>
                       ))}
@@ -535,7 +873,7 @@ const ContentCalendarNovo: React.FC<ContentCalendarNovoProps> = ({ onBack, onNav
                   </button>
 
                   <img 
-                    src={selectedPost.imageUrl} 
+                    src={selectedPost.image_url} 
                     alt="Post"
                     style={{
                       width: '100%',
@@ -634,7 +972,7 @@ const ContentCalendarNovo: React.FC<ContentCalendarNovoProps> = ({ onBack, onNav
                           }}
                         >
                           <img 
-                            src={post.imageUrl} 
+                            src={post.image_url} 
                             alt="Post"
                             style={{
                               width: '100%',
@@ -650,7 +988,7 @@ const ContentCalendarNovo: React.FC<ContentCalendarNovoProps> = ({ onBack, onNav
                               <span style={{ textTransform: 'capitalize' }}>{post.platform}</span>
                             </div>
                             <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
-                              {formatTime(post.scheduledAt)}
+                              {formatTime(post.scheduled_at)}
                             </div>
                           </div>
                           <div style={{
@@ -761,58 +1099,140 @@ const ContentCalendarNovo: React.FC<ContentCalendarNovoProps> = ({ onBack, onNav
                   />
                 </div>
 
-                {/* Platform */}
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.5)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    🎯 Platform
-                  </label>
-                  <div style={{ display: 'flex', gap: '12px' }}>
+                {/* Meta Account Selection */}
+                {metaConnections.length === 0 ? (
+                  <div style={{
+                    padding: '20px',
+                    background: 'rgba(251, 191, 36, 0.1)',
+                    border: '1px solid rgba(251, 191, 36, 0.3)',
+                    borderRadius: '12px',
+                    marginBottom: '20px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '13px', color: '#fbbf24', marginBottom: '12px' }}>
+                      ⚠️ No Meta accounts connected
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setSchedulePlatform('instagram')}
+                      onClick={() => {
+                        setShowScheduleModal(false)
+                        if (onNavigate) {
+                          onNavigate('meta-connect')
+                        }
+                      }}
                       style={{
-                        flex: 1,
-                        padding: '14px',
-                        background: schedulePlatform === 'instagram' 
-                          ? 'linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%)'
-                          : 'rgba(0, 0, 0, 0.3)',
+                        padding: '10px 20px',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         color: '#fff',
-                        border: schedulePlatform === 'instagram' ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '12px',
-                        fontSize: '13px',
+                        border: 'none',
+                        borderRadius: '10px',
+                        fontSize: '12px',
                         fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px'
+                        cursor: 'pointer'
                       }}
                     >
-                      📷 Instagram
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSchedulePlatform('facebook')}
-                      style={{
-                        flex: 1,
-                        padding: '14px',
-                        background: schedulePlatform === 'facebook' ? '#1877f2' : 'rgba(0, 0, 0, 0.3)',
-                        color: '#fff',
-                        border: schedulePlatform === 'facebook' ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '12px',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px'
-                      }}
-                    >
-                      👤 Facebook
+                      Connect Meta Account
                     </button>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    {/* Account Selection */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.5)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        🔗 Meta Account
+                      </label>
+                      <select
+                        value={scheduleConnectionId}
+                        onChange={(e) => {
+                          setScheduleConnectionId(e.target.value)
+                          const connection = metaConnections.find(c => c.id === e.target.value)
+                          if (connection) {
+                            setSchedulePlatform(connection.platform)
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '12px',
+                          fontSize: '14px',
+                          background: 'rgba(0, 0, 0, 0.3)',
+                          color: '#fff',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="">Select account...</option>
+                        {metaConnections
+                          .filter(c => c.platform === schedulePlatform)
+                          .map(connection => (
+                            <option key={connection.id} value={connection.id}>
+                              {connection.page_name || connection.instagram_username || connection.platform}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    {/* Platform */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.5)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        🎯 Platform
+                      </label>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSchedulePlatform('instagram')
+                            setScheduleConnectionId('')
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '14px',
+                            background: schedulePlatform === 'instagram' 
+                              ? 'linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%)'
+                              : 'rgba(0, 0, 0, 0.3)',
+                            color: '#fff',
+                            border: schedulePlatform === 'instagram' ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '12px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          📷 Instagram
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSchedulePlatform('facebook')
+                            setScheduleConnectionId('')
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '14px',
+                            background: schedulePlatform === 'facebook' ? '#1877f2' : 'rgba(0, 0, 0, 0.3)',
+                            color: '#fff',
+                            border: schedulePlatform === 'facebook' ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '12px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          👤 Facebook
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* Image URL */}
                 <div style={{ marginBottom: '20px' }}>
@@ -882,21 +1302,30 @@ const ContentCalendarNovo: React.FC<ContentCalendarNovoProps> = ({ onBack, onNav
                   </button>
                   <button
                     onClick={handleSchedulePost}
-                    disabled={!scheduleImageUrl}
+                    disabled={!scheduleImageUrl || !scheduleConnectionId || scheduling || metaConnections.length === 0}
                     style={{
                       flex: 1,
                       padding: '14px',
-                      background: !scheduleImageUrl ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: !scheduleImageUrl ? 'rgba(255,255,255,0.3)' : '#fff',
+                      background: (!scheduleImageUrl || !scheduleConnectionId || metaConnections.length === 0) 
+                        ? 'rgba(255,255,255,0.1)' 
+                        : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: (!scheduleImageUrl || !scheduleConnectionId || metaConnections.length === 0) 
+                        ? 'rgba(255,255,255,0.3)' 
+                        : '#fff',
                       border: 'none',
                       borderRadius: '12px',
                       fontSize: '14px',
                       fontWeight: '600',
-                      cursor: !scheduleImageUrl ? 'not-allowed' : 'pointer',
-                      boxShadow: !scheduleImageUrl ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.3)'
+                      cursor: (!scheduleImageUrl || !scheduleConnectionId || metaConnections.length === 0) 
+                        ? 'not-allowed' 
+                        : 'pointer',
+                      boxShadow: (!scheduleImageUrl || !scheduleConnectionId || metaConnections.length === 0) 
+                        ? 'none' 
+                        : '0 4px 12px rgba(102, 126, 234, 0.3)',
+                      opacity: scheduling ? 0.7 : 1
                     }}
                   >
-                    ✓ Schedule
+                    {scheduling ? '⏳ Scheduling...' : '✓ Schedule'}
                   </button>
                 </div>
               </div>

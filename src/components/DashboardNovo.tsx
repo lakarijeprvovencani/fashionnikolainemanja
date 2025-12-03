@@ -4,6 +4,7 @@ import { useTokens } from '../contexts/TokenContext'
 import { db, dressedModels, supabase } from '../lib/supabase'
 import CreateModel from './CreateModel'
 import CreateModelNovo from './CreateModelNovo'
+import CreateModelSelectNovo from './CreateModelSelectNovo'
 import DressModel from './DressModel'
 import DressModelNovo from './DressModelNovo'
 import Gallery from './Gallery'
@@ -29,6 +30,7 @@ import EditImageNovo from './EditImageNovo'
 import SubscriptionNovo from './SubscriptionNovo'
 import AccountNovo from './AccountNovo'
 import PricingNovo from './PricingNovo'
+import MetaConnectNovo from './MetaConnectNovo'
 
 interface DashboardNovoProps {
   onBack?: () => void
@@ -36,8 +38,23 @@ interface DashboardNovoProps {
 }
 
 const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => {
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const { tokenData } = useTokens()
+  
+  // Check if user has a paid plan AND subscription is active (not cancelled)
+  const isPaidPlan = tokenData?.plan_type && 
+                     tokenData.plan_type !== 'free' && 
+                     tokenData.status !== 'cancelled'
+  
+  const getPlanDisplayName = (planType: string) => {
+    const names: Record<string, string> = {
+      free: 'Free',
+      monthly: 'Monthly',
+      sixMonth: '6-Month',
+      annual: 'Annual'
+    }
+    return names[planType] || planType
+  }
   const [modelsCount, setModelsCount] = useState(0)
   const [dressedModelsCount, setDressedModelsCount] = useState(0)
   const [activeTab, setActiveTab] = useState('home')
@@ -47,17 +64,58 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
   const [currentScenePrompt, setCurrentScenePrompt] = useState<string>('')
   const [latestModel, setLatestModel] = useState<any>(null)
   const [recentModels, setRecentModels] = useState<any[]>([])
+  const [showModelsWelcome, setShowModelsWelcome] = useState(true)
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false)
 
   // Scroll to top when changing views
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [internalView])
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (showAccountDropdown && !target.closest('.account-icon-container')) {
+        setShowAccountDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showAccountDropdown])
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      setShowAccountDropdown(false)
+      // User will be automatically redirected to login screen by App.tsx
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
   useEffect(() => {
     if (user) {
       checkUserModels()
     }
   }, [user, internalView])
+
+  // Reset welcome screen when navigating away
+  useEffect(() => {
+    if (internalView !== 'dashboard') {
+      setShowModelsWelcome(true)
+    }
+  }, [internalView])
+
+  // Check URL for Meta OAuth callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('meta_connected') === 'true') {
+      setInternalView('content-calendar')
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   const checkUserModels = async () => {
     if (user) {
@@ -92,16 +150,31 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
   if (internalView === 'create-model-upload') {
     return <CreateModelNovo 
       mode="upload"
-      onBack={() => setInternalView('dashboard')} 
+      onBack={() => setInternalView('create-model-select')} 
       onViewModels={() => setInternalView('view-models')}
       onNavigate={onNavigate}
+    />
+  }
+
+  if (internalView === 'create-model-select') {
+    return <CreateModelSelectNovo 
+      onBack={() => setInternalView('dashboard')}
+      onNavigate={(view) => {
+        if (view === 'create-model-ai' || view === 'create-model-upload') {
+          setInternalView(view)
+        } else {
+          onNavigate(view)
+        }
+      }}
+      onSelectAI={() => setInternalView('create-model-ai')}
+      onSelectUpload={() => setInternalView('create-model-upload')}
     />
   }
 
   if (internalView === 'create-model-ai') {
     return <CreateModelNovo 
       mode="ai"
-      onBack={() => setInternalView('dashboard')} 
+      onBack={() => setInternalView('create-model-select')} 
       onViewModels={() => setInternalView('view-models')}
       onNavigate={onNavigate}
     />
@@ -114,7 +187,7 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
         setSelectedModel(model)
         setInternalView('dress-model')
       }}
-      onCreateModel={() => setInternalView('create-model-ai')}
+      onCreateModel={() => setInternalView('create-model-select')}
       onNavigate={onNavigate}
     />
   }
@@ -150,8 +223,8 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
       adType={null}
       onBack={() => setInternalView('dashboard')}
       onNavigate={(view) => {
-        // Handle internal navigation for edit-image, generate-video, create-captions, analytics, content-calendar
-        if (view === 'edit-image' || view === 'generate-video' || view === 'create-captions' || view === 'analytics' || view === 'content-calendar') {
+        // Handle internal navigation for edit-image, generate-video, create-captions, analytics, content-calendar, meta-connect
+        if (view === 'edit-image' || view === 'generate-video' || view === 'create-captions' || view === 'analytics' || view === 'content-calendar' || view === 'meta-connect') {
           setInternalView(view)
         } else {
           onNavigate(view)
@@ -170,14 +243,43 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
   if (internalView === 'history-gallery') {
     return <HistoryGalleryNovo 
       onBack={() => setInternalView('dashboard')}
-      onNavigate={onNavigate}
+      onNavigate={(view) => {
+        // Handle internal navigation for edit-image
+        if (view === 'edit-image') {
+          setInternalView('edit-image')
+        } else {
+          onNavigate(view)
+        }
+      }}
     />
   }
 
   if (internalView === 'content-calendar') {
     return <ContentCalendarNovo 
       onBack={() => setInternalView('dashboard')}
-      onNavigate={onNavigate}
+      onNavigate={(view) => {
+        if (view === 'meta-connect') {
+          setInternalView('meta-connect')
+        } else {
+          onNavigate(view)
+        }
+      }}
+    />
+  }
+
+  if (internalView === 'meta-connect') {
+    return <MetaConnectNovo 
+      onBack={() => setInternalView('dashboard')}
+      onNavigate={(view) => {
+        if (view === 'content-calendar') {
+          setInternalView('content-calendar')
+        } else {
+          onNavigate(view)
+        }
+      }}
+      onConnected={() => {
+        setInternalView('content-calendar')
+      }}
     />
   }
 
@@ -271,24 +373,62 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
   }
 
   if (internalView === 'edit-image') {
+    // Load image from localStorage based on previous view and ad type
+    const previousView = localStorage.getItem('editImage_previousView')
+    const adType = localStorage.getItem('editImage_adType')
+    
+    let imageToEdit = currentGeneratedImage
+    if (previousView === 'history-gallery' || previousView === 'marketing') {
+      if (adType === 'instagram') {
+        imageToEdit = localStorage.getItem('instagram_ad_editImage') || currentGeneratedImage
+      } else if (adType === 'facebook') {
+        imageToEdit = localStorage.getItem('facebook_ad_editImage') || currentGeneratedImage
+      } else {
+        // For dressed_model or default
+        imageToEdit = localStorage.getItem('dressModel_generatedImage') || currentGeneratedImage
+      }
+    }
+    
     return <EditImageNovo 
-      imageUrl={currentGeneratedImage}
+      imageUrl={imageToEdit}
       onBack={() => {
         // Check localStorage for previous view
-        const previousView = localStorage.getItem('editImage_previousView')
-        const adType = localStorage.getItem('editImage_adType')
+        const savedPreviousView = localStorage.getItem('editImage_previousView')
+        const savedAdType = localStorage.getItem('editImage_adType')
         localStorage.removeItem('editImage_previousView')
         localStorage.removeItem('editImage_adType')
-        if (previousView === 'marketing') {
+        if (savedPreviousView === 'history-gallery') {
+          setInternalView('history-gallery')
+        } else if (savedPreviousView === 'marketing') {
           setInternalView('marketing')
         } else {
           setInternalView('dress-model')
         }
       }}
-      onImageUpdated={(newImageUrl) => setCurrentGeneratedImage(newImageUrl)}
+      onImageUpdated={(newImageUrl) => {
+        setCurrentGeneratedImage(newImageUrl)
+        // Save updated image to correct localStorage key
+        const savedPreviousView = localStorage.getItem('editImage_previousView')
+        const savedAdType = localStorage.getItem('editImage_adType')
+        if (savedPreviousView === 'history-gallery' || savedPreviousView === 'marketing') {
+          if (savedAdType === 'instagram') {
+            localStorage.setItem('instagram_ad_editImage', newImageUrl)
+            localStorage.setItem('instagram_ad_generated', newImageUrl)
+          } else if (savedAdType === 'facebook') {
+            localStorage.setItem('facebook_ad_editImage', newImageUrl)
+            localStorage.setItem('facebook_ad_generated', newImageUrl)
+          } else {
+            localStorage.setItem('dressModel_generatedImage', newImageUrl)
+          }
+        } else {
+          localStorage.setItem('dressModel_generatedImage', newImageUrl)
+        }
+      }}
       onNavigate={(view) => {
         if (view === 'marketing') {
           setInternalView('marketing')
+        } else if (view === 'history-gallery') {
+          setInternalView('history-gallery')
         } else {
           onNavigate(view)
         }
@@ -441,31 +581,238 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', margin: '4px 0 0 0' }}>Welcome back, {user?.user_metadata?.full_name?.split(' ')[0] || 'Creator'}</p>
             </div>
           </div>
-          <div 
-            onClick={() => setInternalView('account')}
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '12px',
-              background: 'rgba(255,255,255,0.1)',
-              backdropFilter: 'blur(10px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
+          <div className="account-icon-container" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            {/* Upgrade Button - Above icon, only show for free plan */}
+            {(!isPaidPlan && (tokenData?.plan_type === 'free' || tokenData?.status === 'cancelled')) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setInternalView('pricing')
+                }}
+                style={{
+                  padding: '6px 14px',
+                  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '10px',
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 4px 16px rgba(251, 191, 36, 0.6)',
+                  whiteSpace: 'nowrap',
+                  position: 'relative',
+                  zIndex: 10
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.8)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(251, 191, 36, 0.6)'
+                }}
+              >
+                Upgrade
+              </button>
+            )}
+            
+            <div 
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowAccountDropdown(!showAccountDropdown)
+              }}
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                background: 'rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(10px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                position: 'relative',
+                zIndex: 10
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              
+              {/* Plan Badge - Star for Pro Plan */}
+              {isPaidPlan && (
+                <div style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid rgba(0,0,0,0.3)',
+                  boxShadow: '0 2px 8px rgba(251, 191, 36, 0.5)',
+                  zIndex: 10
+                }}>
+                  <svg 
+                    width="10" 
+                    height="10" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="#fff" 
+                    strokeWidth="2.5"
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#fff"/>
+                  </svg>
+                </div>
+              )}
+            </div>
+            
+            {/* Dropdown Menu */}
+            {showAccountDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '70px',
+                right: '0',
+                background: 'rgba(20, 20, 20, 0.95)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                padding: '6px',
+                paddingTop: '10px',
+                minWidth: '150px',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px'
+              }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowAccountDropdown(false)
+                    setInternalView('account')
+                  }}
+                  style={{
+                    padding: '10px 12px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: 'rgba(255,255,255,0.9)',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  See Profile
+                </button>
+                <div style={{
+                  height: '1px',
+                  background: 'rgba(255,255,255,0.1)',
+                  margin: '2px 0'
+                }}></div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleSignOut()
+                  }}
+                  style={{
+                    padding: '10px 12px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: 'rgba(255,255,255,0.9)',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
+                  Sign Out
+                </button>
+              </div>
+            )}
+            
+            {/* Plan Label - Below icon */}
+            {tokenData?.plan_type && (
+              <div style={{
+                whiteSpace: 'nowrap',
+                fontSize: '9px',
+                fontWeight: '600',
+                color: isPaidPlan ? '#fbbf24' : 'rgba(255,255,255,0.5)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                textAlign: 'center',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                {isPaidPlan && (
+                  <svg 
+                    width="10" 
+                    height="10" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="#fbbf24" 
+                    strokeWidth="2.5"
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                    style={{ flexShrink: 0 }}
+                  >
+                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#fbbf24"/>
+                  </svg>
+                )}
+                <span>
+                  {(tokenData.status === 'cancelled' || tokenData.plan_type === 'free') ? 'Free' : getPlanDisplayName(tokenData.plan_type)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -482,8 +829,115 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
             cursor: 'pointer',
             transition: 'transform 0.2s'
           }}
-          onClick={() => setInternalView('view-models')}
+          onClick={() => {
+            if (showModelsWelcome) {
+              setShowModelsWelcome(false)
+            } else {
+              setInternalView('view-models')
+            }
+          }}
           >
+            {showModelsWelcome ? (
+              /* Welcome Screen */
+              <div style={{
+                width: '100%',
+                minHeight: '400px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '40px 20px',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: '100%',
+                  height: '300px',
+                  borderRadius: '24px',
+                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(30px)',
+                  WebkitBackdropFilter: 'blur(30px)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  transition: 'all 0.4s ease',
+                  boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 8px 32px rgba(102, 126, 234, 0.3)',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.35) 0%, rgba(118, 75, 162, 0.35) 100%)'
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                  e.currentTarget.style.boxShadow = 'inset 0 1px 0 0 rgba(255, 255, 255, 0.3), 0 12px 40px rgba(102, 126, 234, 0.5)'
+                  e.currentTarget.style.transform = 'scale(1.02)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%)'
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                  e.currentTarget.style.boxShadow = 'inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 8px 32px rgba(102, 126, 234, 0.3)'
+                  e.currentTarget.style.transform = 'scale(1)'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowModelsWelcome(false)
+                }}
+                >
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)',
+                    opacity: 0.8,
+                    borderRadius: '24px'
+                  }}></div>
+                  
+                  <div style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    backdropFilter: 'blur(20px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '36px',
+                    marginBottom: '24px',
+                    position: 'relative',
+                    zIndex: 1,
+                    boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)'
+                  }}>✨</div>
+                  
+                  <h2 style={{
+                    fontSize: '28px',
+                    fontWeight: '700',
+                    color: '#fff',
+                    margin: 0,
+                    marginBottom: '12px',
+                    letterSpacing: '0.5px',
+                    position: 'relative',
+                    zIndex: 1,
+                    textShadow: '0 2px 12px rgba(0, 0, 0, 0.4)'
+                  }}>Explore or Create Models</h2>
+                  
+                  <p style={{
+                    fontSize: '14px',
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    margin: 0,
+                    textAlign: 'center',
+                    position: 'relative',
+                    zIndex: 1,
+                    maxWidth: '300px'
+                  }}>Click to browse your AI models or create a new one</p>
+                </div>
+              </div>
+            ) : (
+              <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', padding: '0 4px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ 
@@ -517,7 +971,7 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
               <div
                 onClick={(e) => {
                   e.stopPropagation();
-                  setInternalView('create-model-ai');
+                  setInternalView('create-model-select');
                 }}
                 style={{
                   aspectRatio: '3/4',
@@ -610,6 +1064,8 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
             }}>
               <span style={{ fontSize: '12px', fontWeight: '600' }}>Manage Models</span>
             </div>
+              </>
+            )}
           </div>
 
           {/* Grid of smaller cards - 3 cards */}
@@ -621,9 +1077,22 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
               padding: '12px',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               backdropFilter: 'blur(20px)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
             }}
-            onClick={() => setInternalView('gallery')}
+            onClick={() => setInternalView('history-gallery')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.4)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                 <div style={{ 
@@ -642,18 +1111,53 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
                 width: '100%',
                 height: '100px',
                 borderRadius: '16px',
-                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(30px)',
+                WebkitBackdropFilter: 'blur(30px)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'height 0.3s ease'
-              }}>
-                <span style={{ fontSize: '16px', fontWeight: '600', color: 'rgba(255,255,255,0.8)', letterSpacing: '0.5px' }}>Gallery</span>
+                position: 'relative',
+                overflow: 'hidden',
+                transition: 'all 0.15s ease',
+                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(102, 126, 234, 0.3)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.35) 0%, rgba(118, 75, 162, 0.35) 100%)'
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                e.currentTarget.style.boxShadow = 'inset 0 1px 0 0 rgba(255, 255, 255, 0.3), 0 6px 20px rgba(102, 126, 234, 0.5)'
+                e.currentTarget.style.transform = 'scale(1.02)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%)'
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                e.currentTarget.style.boxShadow = 'inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(102, 126, 234, 0.3)'
+                e.currentTarget.style.transform = 'scale(1)'
+              }}
+              >
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)',
+                  opacity: 0.8,
+                  borderRadius: '16px',
+                  transition: 'opacity 0.15s ease'
+                }}></div>
+                <span style={{ fontSize: '16px', fontWeight: '600', color: '#fff', letterSpacing: '0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)' }}>Gallery</span>
               </div>
               <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>{dressedModelsCount} Photos</span>
-                <button style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '12px', padding: '4px 10px', color: 'white', fontSize: '10px' }}>View</button>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>Browse and manage all your AI-generated content</span>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setInternalView('history-gallery')
+                  }}
+                  style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '12px', padding: '4px 10px', color: 'white', fontSize: '10px', cursor: 'pointer' }}
+                >View</button>
               </div>
             </div>
 
@@ -664,9 +1168,22 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
               padding: '12px',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               backdropFilter: 'blur(20px)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
             }}
             onClick={() => setInternalView('marketing')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.4)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                 <div style={{ 
@@ -685,18 +1202,53 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
                 width: '100%',
                 height: '100px',
                 borderRadius: '16px',
-                background: 'linear-gradient(135deg, rgba(79, 172, 254, 0.2) 0%, rgba(0, 242, 254, 0.2) 100%)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                background: 'linear-gradient(135deg, rgba(79, 172, 254, 0.25) 0%, rgba(0, 242, 254, 0.25) 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(30px)',
+                WebkitBackdropFilter: 'blur(30px)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'height 0.3s ease'
-              }}>
-                <span style={{ fontSize: '16px', fontWeight: '600', color: 'rgba(255,255,255,0.8)', letterSpacing: '0.5px' }}>Marketing</span>
+                position: 'relative',
+                overflow: 'hidden',
+                transition: 'all 0.15s ease',
+                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(79, 172, 254, 0.3)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(79, 172, 254, 0.35) 0%, rgba(0, 242, 254, 0.35) 100%)'
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                e.currentTarget.style.boxShadow = 'inset 0 1px 0 0 rgba(255, 255, 255, 0.3), 0 6px 20px rgba(79, 172, 254, 0.5)'
+                e.currentTarget.style.transform = 'scale(1.02)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(79, 172, 254, 0.25) 0%, rgba(0, 242, 254, 0.25) 100%)'
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                e.currentTarget.style.boxShadow = 'inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(79, 172, 254, 0.3)'
+                e.currentTarget.style.transform = 'scale(1)'
+              }}
+              >
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(135deg, rgba(79, 172, 254, 0.15) 0%, rgba(0, 242, 254, 0.15) 100%)',
+                  opacity: 0.8,
+                  borderRadius: '16px',
+                  transition: 'opacity 0.15s ease'
+                }}></div>
+                <span style={{ fontSize: '16px', fontWeight: '600', color: '#fff', letterSpacing: '0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)' }}>Marketing</span>
               </div>
               <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>Create Ads</span>
-                <button style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '12px', padding: '4px 10px', color: 'white', fontSize: '10px' }}>Go</button>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>Create ads and schedule your content on social media</span>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setInternalView('marketing')
+                  }}
+                  style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '12px', padding: '4px 10px', color: 'white', fontSize: '10px', cursor: 'pointer' }}
+                >Go</button>
               </div>
             </div>
 
@@ -707,9 +1259,22 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
               padding: '12px',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               backdropFilter: 'blur(20px)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
             }}
             onClick={() => setInternalView('brand-memory-map')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.4)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                 <div style={{ 
@@ -728,18 +1293,53 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
                 width: '100%',
                 height: '100px',
                 borderRadius: '16px',
-                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(30px)',
+                WebkitBackdropFilter: 'blur(30px)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'height 0.3s ease'
-              }}>
-                <span style={{ fontSize: '16px', fontWeight: '600', color: 'rgba(255,255,255,0.8)', letterSpacing: '0.5px' }}>Brand Memory</span>
+                position: 'relative',
+                overflow: 'hidden',
+                transition: 'all 0.15s ease',
+                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(102, 126, 234, 0.3)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.35) 0%, rgba(118, 75, 162, 0.35) 100%)'
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                e.currentTarget.style.boxShadow = 'inset 0 1px 0 0 rgba(255, 255, 255, 0.3), 0 6px 20px rgba(102, 126, 234, 0.5)'
+                e.currentTarget.style.transform = 'scale(1.02)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%)'
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                e.currentTarget.style.boxShadow = 'inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(102, 126, 234, 0.3)'
+                e.currentTarget.style.transform = 'scale(1)'
+              }}
+              >
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)',
+                  opacity: 0.8,
+                  borderRadius: '16px',
+                  transition: 'opacity 0.15s ease'
+                }}></div>
+                <span style={{ fontSize: '16px', fontWeight: '600', color: '#fff', letterSpacing: '0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)' }}>Brand Memory</span>
               </div>
               <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>Brand Profiles</span>
-                <button style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '12px', padding: '4px 10px', color: 'white', fontSize: '10px' }}>Manage</button>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>Store and manage your brand information</span>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setInternalView('brand-memory-map')
+                  }}
+                  style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '12px', padding: '4px 10px', color: 'white', fontSize: '10px', cursor: 'pointer' }}
+                >Manage</button>
               </div>
             </div>
           </div>
