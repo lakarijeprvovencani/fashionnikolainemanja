@@ -65,6 +65,7 @@ const MarketingNovo: React.FC<MarketingNovoProps> = ({ adType, onBack, onNavigat
   }
   
   const [selectedAdType, setSelectedAdType] = useState<'instagram' | 'facebook' | null>(getInitialAdType)
+  const [aspectRatio, setAspectRatio] = useState<'4:5' | '9:16' | '16:9' | '1:1'>('4:5')
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [prompt, setPrompt] = useState('')
@@ -404,8 +405,15 @@ IMPORTANT: Incorporate the brand voice, target audience, and marketing preferenc
 
       const base64Image = uploadedImage.split(',')[1]
 
+      const aspectRatioMap: Record<string, string> = {
+        '4:5': '4:5 (Instagram feed/post)',
+        '9:16': '9:16 (Instagram Stories/Reels)',
+        '16:9': '16:9 (Instagram video/landscape)',
+        '1:1': '1:1 (Square format)'
+      }
+
       const adTypePrompt = selectedAdType === 'instagram'
-        ? 'Create a professional Instagram ad. Optimize for Instagram feed (4:5 aspect ratio recommended).'
+        ? `Create a professional Instagram ad. Optimize for Instagram with ${aspectRatioMap[aspectRatio]} aspect ratio.`
         : 'Create a professional Facebook ad. Optimize for Facebook feed (1.91:1 or 1:1 aspect ratio recommended).'
 
       const fullPrompt = `${adTypePrompt} 
@@ -434,13 +442,13 @@ Generate a professional, eye-catching ad image.`
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-image-preview',
         contents: { parts: [inputImagePart, { text: fullPrompt }] },
-        config: {
-          responseModalities: [Modality.IMAGE],
-          imageConfig: {
-            aspectRatio: selectedAdType === 'instagram' ? '4:5' : '1:1',
-            numberOfImages: 1
+          config: {
+            responseModalities: [Modality.IMAGE],
+            imageConfig: {
+              aspectRatio: selectedAdType === 'instagram' ? aspectRatio : '1:1',
+              numberOfImages: 1
+            }
           }
-        }
       })
 
       const imagePart = response.candidates?.[0]?.content?.parts.find((part: any) => part.inlineData)
@@ -551,14 +559,17 @@ Generate a professional, eye-catching ad image.`
 
           <div style={{ marginTop: '40px' }}>
             <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '12px', letterSpacing: '-0.5px', textAlign: 'center' }}>
-              Choose Ad Platform
+              Create Instagram Ad
             </h2>
             <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: '32px', maxWidth: '500px', margin: '0 auto 32px' }}>
-              Create professional ads for Instagram and Facebook
+              Create professional ads for Instagram
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', maxWidth: '900px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', maxWidth: '900px', margin: '0 auto' }}>
               <div
-                onClick={() => setSelectedAdType('instagram')}
+                onClick={() => {
+                  setSelectedAdType('instagram')
+                  setAspectRatio('4:5')
+                }}
                 style={{
                   background: 'rgba(0, 0, 0, 0.4)',
                   borderRadius: '24px',
@@ -569,7 +580,9 @@ Generate a professional, eye-catching ad image.`
                   boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
                   cursor: 'pointer',
                   transition: 'all 0.3s',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  maxWidth: '400px',
+                  width: '100%'
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
@@ -601,53 +614,6 @@ Generate a professional, eye-catching ad image.`
                 </h3>
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', margin: 0 }}>
                   Create engaging Instagram ads
-                </p>
-              </div>
-
-              <div
-                onClick={() => setSelectedAdType('facebook')}
-                style={{
-                  background: 'rgba(0, 0, 0, 0.4)',
-                  borderRadius: '24px',
-                  padding: '32px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(20px)',
-                  WebkitBackdropFilter: 'blur(20px)',
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s',
-                  textAlign: 'center'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
-                  e.currentTarget.style.transform = 'translateY(-4px)'
-                  e.currentTarget.style.boxShadow = '0 24px 48px rgba(0,0,0,0.4)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.3)'
-                }}
-              >
-                <div style={{ 
-                  width: '56px', 
-                  height: '56px', 
-                  borderRadius: '16px', 
-                  background: '#1877f2', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  margin: '0 auto 16px'
-                }}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                </div>
-                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>
-                  Facebook Ad
-                </h3>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', margin: 0 }}>
-                  Create professional Facebook ads
                 </p>
               </div>
             </div>
@@ -743,7 +709,7 @@ Generate a professional, eye-catching ad image.`
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                     </svg>
-                    <span style={{ fontWeight: '600' }}>Connect Instagram & Facebook</span>
+                    <span style={{ fontWeight: '600' }}>Connect Instagram</span>
                   </div>
                   Plan your content, set posting times, and automatically publish to your connected social media accounts
                 </div>
@@ -878,8 +844,8 @@ Generate a professional, eye-catching ad image.`
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center', 
-          marginBottom: '30px',
-          paddingTop: '20px' 
+          marginBottom: '16px',
+          paddingTop: '10px' 
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button 
@@ -888,6 +854,7 @@ Generate a professional, eye-catching ad image.`
                   // Going back to platform selection - clear saved ad type
                   safeLocalStorage.removeItem('marketing_selectedAdType')
                   setSelectedAdType(null)
+                  setAspectRatio('4:5')
                   setUploadedImage(null)
                   setImageFile(null)
                   setPrompt('')
@@ -903,10 +870,10 @@ Generate a professional, eye-catching ad image.`
               ←
             </button>
             <div>
-              <h1 style={{ fontSize: '28px', fontWeight: '700', margin: 0, letterSpacing: '-0.5px' }}>
+              <h1 style={{ fontSize: '24px', fontWeight: '700', margin: 0, letterSpacing: '-0.5px' }}>
                 Create {selectedAdType === 'instagram' ? 'Instagram' : 'Facebook'} Ad
               </h1>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', margin: '4px 0 0 0' }}>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: '2px 0 0 0' }}>
                 Upload image and describe your ad requirements
               </p>
             </div>
@@ -915,31 +882,31 @@ Generate a professional, eye-catching ad image.`
 
         <div className="marketing-grid">
           {/* LEFT SIDE: CONTROLS */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
             {/* 1. Upload Image */}
             <div style={{
               background: 'rgba(0, 0, 0, 0.4)',
-              borderRadius: '32px',
-              padding: '24px',
+              borderRadius: '24px',
+              padding: '16px',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
               boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
             }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px', margin: '0 0 16px 0' }}>1. Upload Image</h3>
+              <h3 style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', margin: '0 0 12px 0' }}>1. Upload Image</h3>
               
               {uploadedImage ? (
-                <div style={{ position: 'relative', marginBottom: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <div style={{ position: 'relative', marginBottom: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                   <img 
                     src={uploadedImage} 
                     alt="Uploaded" 
                     style={{ 
                       maxWidth: '100%',
-                      maxHeight: '300px',
+                      maxHeight: '200px',
                       width: 'auto',
                       height: 'auto',
-                      borderRadius: '16px', 
+                      borderRadius: '12px', 
                       boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                       border: '1px solid rgba(255,255,255,0.1)',
                       objectFit: 'contain'
@@ -994,11 +961,11 @@ Generate a professional, eye-catching ad image.`
                     justifyContent: 'center',
                     aspectRatio: '1',
                     border: `2px dashed ${isDragging ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)'}`,
-                    borderRadius: '20px',
+                    borderRadius: '16px',
                     background: isDragging ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.2)',
                     cursor: 'pointer',
                     transition: 'all 0.3s ease',
-                    minHeight: '200px',
+                    minHeight: '150px',
                     transform: isDragging ? 'scale(1.02)' : 'scale(1)',
                     backdropFilter: 'blur(10px)'
                   }}
@@ -1024,24 +991,24 @@ Generate a professional, eye-catching ad image.`
                   />
                   <div style={{ textAlign: 'center', color: isDragging ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.6)', pointerEvents: 'none' }}>
                     <svg 
-                      width="48" 
-                      height="48" 
+                      width="36" 
+                      height="36" 
                       viewBox="0 0 24 24" 
                       fill="none" 
                       stroke="currentColor" 
                       strokeWidth="2"
                       strokeLinecap="round" 
                       strokeLinejoin="round"
-                      style={{ margin: '0 auto 12px', display: 'block' }}
+                      style={{ margin: '0 auto 8px', display: 'block' }}
                     >
                       <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                       <circle cx="8.5" cy="8.5" r="1.5"></circle>
                       <polyline points="21 15 16 10 5 21"></polyline>
                     </svg>
-                    <p style={{ fontSize: '14px', fontWeight: '500', margin: 0 }}>
+                    <p style={{ fontSize: '12px', fontWeight: '500', margin: 0 }}>
                       {isDragging ? 'Drop image here' : 'Click or drag to upload image'}
                     </p>
-                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>PNG, JPG up to 10MB</p>
+                    <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>PNG, JPG up to 10MB</p>
                   </div>
                 </div>
               )}
@@ -1050,15 +1017,15 @@ Generate a professional, eye-catching ad image.`
             {/* 2. Ad Requirements */}
             <div style={{
               background: 'rgba(0, 0, 0, 0.4)',
-              borderRadius: '32px',
-              padding: '24px',
+              borderRadius: '24px',
+              padding: '16px',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
               boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>2. Ad Requirements</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>2. Ad Requirements</h3>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     onClick={generateExample}
@@ -1132,12 +1099,12 @@ Generate a professional, eye-catching ad image.`
                 placeholder="Describe what kind of ad you want to create...&#10;&#10;Example:&#10;Create a modern, eye-catching ad for a summer fashion collection. Include bold text overlay with 'Summer Sale 50% Off'. Use vibrant colors and make it feel energetic and trendy."
                 style={{
                   width: '100%',
-                  height: '100px',
-                  padding: '12px',
+                  height: '80px',
+                  padding: '10px',
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: '8px',
-                  fontSize: '13px',
-                  lineHeight: '1.7',
+                  fontSize: '12px',
+                  lineHeight: '1.6',
                   resize: 'none',
                   outline: 'none',
                   background: 'rgba(0, 0, 0, 0.2)',
@@ -1156,17 +1123,89 @@ Generate a professional, eye-catching ad image.`
               />
             </div>
 
+            {/* 3. Aspect Ratio Selection */}
+            {selectedAdType === 'instagram' && (
+              <div style={{
+                background: 'rgba(0, 0, 0, 0.4)',
+                borderRadius: '24px',
+                padding: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
+              }}>
+                <h3 style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', margin: '0 0 12px 0' }}>3. Aspect Ratio</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                  {(['4:5', '9:16', '16:9', '1:1'] as const).map((ratio) => (
+                    <button
+                      key={ratio}
+                      onClick={() => setAspectRatio(ratio)}
+                      style={{
+                        padding: '8px',
+                        background: aspectRatio === ratio ? 'rgba(102, 126, 234, 0.3)' : 'rgba(0, 0, 0, 0.2)',
+                        border: aspectRatio === ratio ? '2px solid rgba(102, 126, 234, 0.6)' : '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '12px',
+                        color: aspectRatio === ratio ? '#fff' : 'rgba(255,255,255,0.7)',
+                        fontSize: '11px',
+                        fontWeight: aspectRatio === ratio ? '600' : '500',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        aspectRatio: '1',
+                        backdropFilter: 'blur(10px)'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (aspectRatio !== ratio) {
+                          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (aspectRatio !== ratio) {
+                          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)'
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                        }
+                      }}
+                    >
+                      <div style={{ 
+                        fontSize: '13px', 
+                        fontWeight: '700',
+                        lineHeight: '1.2'
+                      }}>
+                        {ratio}
+                      </div>
+                      <div style={{ 
+                        fontSize: '9px', 
+                        color: aspectRatio === ratio ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.5)',
+                        textAlign: 'center',
+                        lineHeight: '1.2'
+                      }}>
+                        {ratio === '4:5' && 'Feed/Post'}
+                        {ratio === '9:16' && 'Stories/Reels'}
+                        {ratio === '16:9' && 'Landscape'}
+                        {ratio === '1:1' && 'Square'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Generate Button */}
             <button
               onClick={generateAd}
               disabled={loading || !uploadedImage || !prompt.trim()}
               style={{
                 width: '100%',
-                padding: '16px',
+                padding: '12px',
                 background: loading || !uploadedImage || !prompt.trim() ? 'rgba(0, 0, 0, 0.2)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 color: loading || !uploadedImage || !prompt.trim() ? 'rgba(255,255,255,0.4)' : '#fff',
                 border: 'none',
-                fontSize: '13px',
+                fontSize: '12px',
                 fontWeight: '600',
                 cursor: loading || !uploadedImage || !prompt.trim() ? 'not-allowed' : 'pointer',
                 borderRadius: '8px',
