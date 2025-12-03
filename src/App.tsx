@@ -4,6 +4,7 @@ import { TokenProvider } from './contexts/TokenContext'
 import Login from './components/Login'
 import SignUp from './components/SignUp'
 import Dashboard from './components/Dashboard'
+import TokenCounter from './components/TokenCounter'
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth()
@@ -21,7 +22,21 @@ const AppContent: React.FC = () => {
   }
 
   if (user) {
-    return <Dashboard />
+    return (
+      <>
+        <Dashboard />
+        {/* Token Counter - Fixed bottom right corner, visible on all pages */}
+        <div style={{
+          position: 'fixed',
+          bottom: '30px',
+          right: '30px',
+          zIndex: 9999,
+          pointerEvents: 'auto'
+        }}>
+          <TokenCounter />
+        </div>
+      </>
+    )
   }
 
   if (isSignUp) {

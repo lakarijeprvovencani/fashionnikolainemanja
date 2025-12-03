@@ -55,32 +55,50 @@ const TokenCounter: React.FC<TokenCounterProps> = ({ onRefresh }) => {
       display: 'flex',
       alignItems: 'center',
       gap: '12px',
-      padding: '8px 16px',
-      background: 'white',
-      borderRadius: '12px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      minWidth: '200px'
-    }}>
+      padding: '12px 16px',
+      background: 'rgba(0, 0, 0, 0.4)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      borderRadius: '16px',
+      border: '1px solid rgba(255, 255, 255, 0.1)',
+      minWidth: '220px',
+      transition: 'all 0.3s ease',
+      transform: 'translateY(0)',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.transform = 'translateY(-2px)'
+      e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)'
+      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+      e.currentTarget.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.4)'
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.transform = 'translateY(0)'
+      e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'
+      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+      e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3)'
+    }}
+    >
       <div style={{ flex: 1 }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '4px'
+          marginBottom: '6px'
         }}>
           <span style={{
-            fontSize: '12px',
+            fontSize: '11px',
             fontWeight: '600',
-            color: '#718096',
+            color: 'rgba(255, 255, 255, 0.5)',
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
           }}>
             Tokens
           </span>
           <span style={{
-            fontSize: '14px',
+            fontSize: '16px',
             fontWeight: '700',
-            color: '#1a202c'
+            color: '#ffffff'
           }}>
             {loading ? '...' : formatNumber(getTokensRemaining())}
           </span>
@@ -90,23 +108,25 @@ const TokenCounter: React.FC<TokenCounterProps> = ({ onRefresh }) => {
         <div style={{
           width: '100%',
           height: '6px',
-          background: '#e2e8f0',
+          background: 'rgba(255, 255, 255, 0.1)',
           borderRadius: '3px',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          marginBottom: '4px'
         }}>
           <div style={{
             width: `${Math.min(100, Math.max(0.1, usagePercentage))}%`,
             height: '100%',
             background: getColorClass(),
             transition: 'width 0.3s ease, background 0.3s ease',
-            minWidth: usagePercentage > 0 ? '2px' : '0'
+            minWidth: usagePercentage > 0 ? '2px' : '0',
+            boxShadow: `0 0 8px ${getColorClass()}40`
           }} />
         </div>
 
         {tokenData.tokens_limit > 0 && (
           <div style={{
             fontSize: '10px',
-            color: '#a0aec0',
+            color: 'rgba(255, 255, 255, 0.4)',
             marginTop: '2px'
           }}>
             {formatNumber(tokenData.tokens_used)} / {formatNumber(tokenData.tokens_limit)} used
@@ -119,27 +139,27 @@ const TokenCounter: React.FC<TokenCounterProps> = ({ onRefresh }) => {
         onClick={handleRefresh}
         disabled={loading}
         style={{
-          width: '28px',
-          height: '28px',
+          width: '32px',
+          height: '32px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: loading ? '#e2e8f0' : '#f7fafc',
-          border: '1px solid #e2e8f0',
-          borderRadius: '6px',
+          background: loading ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          borderRadius: '8px',
           cursor: loading ? 'not-allowed' : 'pointer',
           transition: 'all 0.2s',
           flexShrink: 0
         }}
         onMouseEnter={(e) => {
           if (!loading) {
-            e.currentTarget.style.background = '#edf2f7'
-            e.currentTarget.style.borderColor = '#cbd5e0'
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
           }
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = '#f7fafc'
-          e.currentTarget.style.borderColor = '#e2e8f0'
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
         }}
       >
         <svg 
@@ -151,9 +171,9 @@ const TokenCounter: React.FC<TokenCounterProps> = ({ onRefresh }) => {
           strokeLinecap="round" 
           strokeLinejoin="round"
           style={{
-            width: '14px',
-            height: '14px',
-            color: '#718096',
+            width: '16px',
+            height: '16px',
+            color: 'rgba(255, 255, 255, 0.7)',
             animation: loading ? 'spin 1s linear infinite' : 'none'
           }}
         >
