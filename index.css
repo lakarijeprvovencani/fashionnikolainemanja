@@ -20,14 +20,36 @@ code {
     monospace;
 }
 
+/* Loading screen */
+.loading-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+.loading-content {
+  text-align: center;
+  color: white;
+}
+
+.loading-content p {
+  margin-top: 20px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 2px;
+}
+
 /* Loading spinner */
 .spinner {
-  border: 2px solid #f3f3f3;
-  border-top: 2px solid #000000;
-  border-left: 2px solid #000000;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top: 3px solid #ec4899;
+  border-left: 3px solid #8b5cf6;
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 50px;
+  height: 50px;
+  margin: 0 auto;
   animation: spin 1s linear infinite;
 }
 

@@ -59,6 +59,27 @@ export const auth = {
   }
 }
 
+// Helper function to ensure user profile exists (fixes foreign key constraint errors)
+export const ensureUserProfile = async (userId: string, email?: string) => {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({
+        id: userId,
+        email: email || '',
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' })
+    
+    if (error) {
+      console.warn('Profile upsert warning:', error.message)
+    }
+    return { success: true }
+  } catch (err) {
+    console.warn('Profile ensure error:', err)
+    return { success: false }
+  }
+}
+
 // Database helper functions
 export const db = {
   // Get user profile
@@ -296,6 +317,9 @@ export const dressedModels = {
     imageUrl: string
     clothingData?: any
   }) {
+    // Ensure user profile exists first
+    await ensureUserProfile(data.userId)
+    
     const { data: result, error } = await supabase
       .from('dressed_models')
       .insert({
@@ -579,18 +603,40 @@ export const tokens = {
 
   // Check if user has enough tokens
   async hasEnoughTokens(userId: string, requiredTokens: number) {
+    try {
+      // Try RPC first
     const { data, error } = await supabase
       .rpc('user_has_tokens', { 
         p_user_id: userId, 
         p_required_tokens: requiredTokens 
       })
     
-    if (error) {
-      console.error('Error checking tokens:', error)
-      return { hasTokens: false, error }
+      if (!error && data !== null) {
+        return { hasTokens: data, error: null }
+      }
+      
+      // Fallback: check directly from subscription table
+      console.log('⚠️ RPC failed, using fallback token check')
+      const { data: subscription, error: subError } = await supabase
+        .from('subscriptions')
+        .select('tokens_limit, tokens_used')
+        .eq('user_id', userId)
+        .single()
+      
+      if (subError || !subscription) {
+        console.error('Error fetching subscription:', subError)
+        return { hasTokens: false, error: subError }
     }
     
-    return { hasTokens: data, error: null }
+      const tokensRemaining = subscription.tokens_limit - subscription.tokens_used
+      const hasTokens = tokensRemaining >= requiredTokens
+      console.log(`📊 Token check: ${tokensRemaining} remaining, need ${requiredTokens}, hasTokens: ${hasTokens}`)
+      
+      return { hasTokens, error: null }
+    } catch (err) {
+      console.error('Error checking tokens:', err)
+      return { hasTokens: false, error: err }
+    }
   },
 
   // Deduct tokens from user's balance
@@ -1263,7 +1309,7 @@ export const aiGeneratedContent = {
   // Save AI-generated content (autosave)
   async saveContent(data: {
     userId: string
-    contentType: 'model' | 'dressed_model' | 'caption_instagram' | 'caption_webshop' | 'caption_facebook' | 'caption_email' | 'generated_image' | 'generated_video' | 'edited_image'
+    contentType: 'model' | 'dressed_model' | 'instagram_ad' | 'facebook_ad' | 'caption_instagram' | 'caption_webshop' | 'caption_facebook' | 'caption_email' | 'generated_image' | 'generated_video' | 'edited_image'
     title?: string
     imageUrl?: string
     videoUrl?: string

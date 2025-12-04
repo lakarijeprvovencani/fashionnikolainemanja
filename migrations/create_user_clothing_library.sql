@@ -56,3 +56,4 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON user_clothing_library TO authenticated;
 
 
 
+

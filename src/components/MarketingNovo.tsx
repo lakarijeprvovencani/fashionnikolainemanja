@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { brandProfiles } from '../lib/supabase'
+import { notifyTokenUpdate } from '../contexts/TokenContext'
+import { brandProfiles, meta, supabase, tokens, storage, aiGeneratedContent } from '../lib/supabase'
 import { GoogleGenAI, Modality } from '@google/genai'
+import { generateSocialMediaCaptions } from '../lib/gemini'
 
 // Safe localStorage wrapper to handle quota exceeded errors
 const safeLocalStorage = {
@@ -50,6 +52,47 @@ interface MarketingNovoProps {
   onNavigate: (view: string) => void
 }
 
+const AD_TOKEN_COST = 1 // Cost for generating an ad
+
+// Design templates configuration
+const DESIGN_TEMPLATES = {
+  '4:5': [
+    { id: '4x5-1', src: '/assets/templates/4x5-1.png', name: 'Black Friday Bold' },
+    { id: '4x5-2', src: '/assets/templates/4x5-2.png', name: 'Minimalist Sale' },
+    { id: '4x5-3', src: '/assets/templates/4x5-3.png', name: 'Elegant Promo' },
+    { id: '4x5-4', src: '/assets/templates/4x5-4.png', name: 'Modern Fashion' },
+    { id: '4x5-5', src: '/assets/templates/4x5-5.png', name: 'Urban Style' },
+    { id: '4x5-6', src: '/assets/templates/4x5-6.png', name: 'Luxury Brand' },
+    { id: '4x5-7', src: '/assets/templates/4x5-7.png', name: 'Summer Vibes' },
+    { id: '4x5-8', src: '/assets/templates/4x5-8.png', name: 'Winter Collection' },
+    { id: '4x5-9', src: '/assets/templates/4x5-9.png', name: 'Spring Sale' },
+    { id: '4x5-10', src: '/assets/templates/4x5-10.png', name: 'Autumn Look' },
+    { id: '4x5-11', src: '/assets/templates/4x5-11.png', name: 'Flash Deal' },
+    { id: '4x5-12', src: '/assets/templates/4x5-12.png', name: 'New Arrival' },
+    { id: '4x5-13', src: '/assets/templates/4x5-13.png', name: 'Best Seller' },
+    { id: '4x5-14', src: '/assets/templates/4x5-14.png', name: 'Limited Edition' },
+    { id: '4x5-15', src: '/assets/templates/4x5-15.png', name: 'Exclusive Offer' },
+    { id: '4x5-16', src: '/assets/templates/4x5-16.png', name: 'Premium Style' },
+    { id: '4x5-17', src: '/assets/templates/4x5-17.png', name: 'Trendy Look' },
+    { id: '4x5-18', src: '/assets/templates/4x5-18.png', name: 'Classic Design' },
+    { id: '4x5-19', src: '/assets/templates/4x5-19.png', name: 'Bold Statement' },
+    { id: '4x5-20', src: '/assets/templates/4x5-20.png', name: 'Clean Layout' },
+    { id: '4x5-21', src: '/assets/templates/4x5-21.png', name: 'Dynamic Promo' },
+    { id: '4x5-22', src: '/assets/templates/4x5-22.png', name: 'Stylish Ad' },
+    { id: '4x5-23', src: '/assets/templates/4x5-23.png', name: 'Fashion Forward' },
+  ],
+  '1:1': [
+    { id: '1x1-1', src: '/assets/templates/1x1-1.png', name: 'Square Sale' },
+    { id: '1x1-2', src: '/assets/templates/1x1-2.png', name: 'Compact Promo' },
+    { id: '1x1-3', src: '/assets/templates/1x1-3.png', name: 'Mini Banner' },
+    { id: '1x1-4', src: '/assets/templates/1x1-4.png', name: 'Grid Ready' },
+    { id: '1x1-5', src: '/assets/templates/1x1-5.png', name: 'Social Square' },
+    { id: '1x1-6', src: '/assets/templates/1x1-6.png', name: 'Product Focus' },
+    { id: '1x1-7', src: '/assets/templates/1x1-7.png', name: 'Brand Highlight' },
+    { id: '1x1-8', src: '/assets/templates/1x1-8.png', name: 'Quick Ad' },
+  ]
+}
+
 const MarketingNovo: React.FC<MarketingNovoProps> = ({ adType, onBack, onNavigate }) => {
   const { user } = useAuth()
   
@@ -75,6 +118,21 @@ const MarketingNovo: React.FC<MarketingNovoProps> = ({ adType, onBack, onNavigat
   const [generatingExample, setGeneratingExample] = useState(false)
   const [expandingText, setExpandingText] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  
+  // Tab and captions state
+  const [activeTab, setActiveTab] = useState<'create' | 'preview'>('create')
+  const [generatedCaption, setGeneratedCaption] = useState<string>('')
+  const [generatingCaption, setGeneratingCaption] = useState(false)
+  const [metaConnections, setMetaConnections] = useState<any[]>([])
+  const [scheduleDate, setScheduleDate] = useState<string>('')
+  const [scheduleTime, setScheduleTime] = useState<string>('12:00')
+  const [scheduleConnectionId, setScheduleConnectionId] = useState<string>('')
+  const [scheduling, setScheduling] = useState(false)
+  
+  // Template picker state
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<{ id: string; src: string; name: string; ratio: '4:5' | '1:1' } | null>(null)
+  const [templatePickerTab, setTemplatePickerTab] = useState<'4:5' | '1:1'>('4:5')
 
   // Save selected ad type to localStorage when it changes
   useEffect(() => {
@@ -368,6 +426,18 @@ Provide an expanded, more detailed version that includes:
       return
     }
 
+    if (!user) {
+      setError('Please log in to generate ads')
+      return
+    }
+
+    // Check if user has enough tokens
+    const { hasTokens } = await tokens.hasEnoughTokens(user.id, AD_TOKEN_COST)
+    if (!hasTokens) {
+      setError('Insufficient tokens. Please upgrade your plan.')
+      return
+    }
+
     setLoading(true)
     setError('')
 
@@ -405,6 +475,26 @@ IMPORTANT: Incorporate the brand voice, target audience, and marketing preferenc
 
       const base64Image = uploadedImage.split(',')[1]
 
+      // Load template image if selected
+      let templateBase64: string | null = null
+      if (selectedTemplate) {
+        try {
+          const templateResponse = await fetch(selectedTemplate.src)
+          const templateBlob = await templateResponse.blob()
+          const templateReader = new FileReader()
+          templateBase64 = await new Promise((resolve) => {
+            templateReader.onloadend = () => {
+              const base64 = (templateReader.result as string).split(',')[1]
+              resolve(base64)
+            }
+            templateReader.readAsDataURL(templateBlob)
+          })
+          console.log('✅ Template image loaded:', selectedTemplate.name)
+        } catch (err) {
+          console.warn('⚠️ Could not load template image, proceeding without it:', err)
+        }
+      }
+
       const aspectRatioMap: Record<string, string> = {
         '4:5': '4:5 (Instagram feed/post)',
         '9:16': '9:16 (Instagram Stories/Reels)',
@@ -416,22 +506,55 @@ IMPORTANT: Incorporate the brand voice, target audience, and marketing preferenc
         ? `Create a professional Instagram ad. Optimize for Instagram with ${aspectRatioMap[aspectRatio]} aspect ratio.`
         : 'Create a professional Facebook ad. Optimize for Facebook feed (1.91:1 or 1:1 aspect ratio recommended).'
 
-      const fullPrompt = `${adTypePrompt} 
+      // Build prompt based on whether template is selected
+      const templateInstructions = selectedTemplate && templateBase64 
+        ? `
 
-Based on the uploaded image and the following requirements:
+DESIGN TEMPLATE REFERENCE:
+I am providing you with a design template image. You MUST create the ad following this exact design STYLE, but with IMPORTANT rules:
+
+COPY FROM TEMPLATE (visual style only):
+- Layout, composition, and visual structure
+- Font styles, typography aesthetics, and text placement positions
+- Color scheme, gradients, and visual effects
+- Graphic elements style (shapes, lines, decorations)
+- Overall aesthetic, mood, and visual hierarchy
+
+⚠️ DO NOT COPY FROM TEMPLATE:
+- DO NOT use any text/words that appear in the template image
+- DO NOT include logos, brand names, or slogans from the template
+- DO NOT copy dates, numbers, or any written content from the template
+- IGNORE all text visible in the template - it's just placeholder
+
+ONLY use text that the user specifies in their requirements below. If they say "30% discount" - write only that. Do not add any other text from the template.
+
+The template shows you HOW to design (style), not WHAT to write (content).`
+        : ''
+
+      const fullPrompt = `${adTypePrompt}${templateInstructions}
+
+Based on the uploaded ${selectedTemplate ? 'product/model image' : 'image'} and the following requirements:
 ${prompt}
 ${brandContext}
 
-Edit and enhance the image to create an ad. You can:
+${selectedTemplate ? `Create the ad matching the provided design template STYLE ONLY. Use the template as your visual guide for:
+- Layout and composition structure
+- Typography style and text positioning (but NOT the actual text)
+- Graphic elements and decorations style
+- Color palette and effects
+- Overall visual hierarchy
+
+CRITICAL: Only include text that the user requested above. Do not copy ANY text from the template image - treat all template text as placeholder examples only.` : `Edit and enhance the image to create an ad. You can:
 - Add text overlays
 - Add graphic elements
 - Adjust colors and styling
 - Add call-to-action elements
-- Make it visually appealing and on-brand
-- Optimize for ${selectedAdType} platform
+- Make it visually appealing and on-brand`}
 
+Optimize for ${selectedAdType} platform.
 Generate a professional, eye-catching ad image.`
 
+      // Prepare image parts
       const inputImagePart = {
         inlineData: {
           mimeType: imageFile?.type || 'image/png',
@@ -439,9 +562,36 @@ Generate a professional, eye-catching ad image.`
         }
       }
 
+      // Build parts array - include template if available
+      const contentParts: any[] = []
+      
+      if (selectedTemplate && templateBase64) {
+        // Add template image first so AI sees it as reference
+        contentParts.push({
+          inlineData: {
+            mimeType: 'image/png',
+            data: templateBase64
+          }
+        })
+        contentParts.push({ text: 'This is the DESIGN TEMPLATE to follow:' })
+      }
+      
+      // Add the user's uploaded image
+      contentParts.push(inputImagePart)
+      contentParts.push({ text: selectedTemplate ? 'This is the PRODUCT/MODEL IMAGE to use:' : '' })
+      
+      // Add the main prompt
+      contentParts.push({ text: fullPrompt })
+
+      // Helper function for API call with timeout
+      const generateWithTimeout = async (timeoutMs: number = 90000) => {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+        
+        try {
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-image-preview',
-        contents: { parts: [inputImagePart, { text: fullPrompt }] },
+        contents: { parts: contentParts },
           config: {
             responseModalities: [Modality.IMAGE],
             imageConfig: {
@@ -450,6 +600,60 @@ Generate a professional, eye-catching ad image.`
             }
           }
       })
+          clearTimeout(timeoutId)
+          return response
+        } catch (err) {
+          clearTimeout(timeoutId)
+          throw err
+        }
+      }
+
+      // Retry logic - try up to 3 times
+      let response
+      let lastError
+      const maxRetries = 3
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`🚀 Attempt ${attempt}/${maxRetries} - Generating ad...`)
+          response = await generateWithTimeout(90000) // 90 second timeout
+          break // Success - exit loop
+        } catch (err: any) {
+          lastError = err
+          const errorMsg = err.message || err.toString() || ''
+          console.error(`❌ Attempt ${attempt} failed:`, errorMsg)
+          
+          // Check if it's a 503 (overloaded) or timeout error
+          const isOverloaded = errorMsg.includes('503') || 
+                               errorMsg.includes('overloaded') || 
+                               errorMsg.includes('UNAVAILABLE') ||
+                               err.status === 503
+          const isTimeout = err.name === 'AbortError' || errorMsg.includes('timeout')
+          
+          if ((isOverloaded || isTimeout) && attempt < maxRetries) {
+            const waitTime = attempt * 5000 // Wait 5s, 10s, 15s (longer waits)
+            console.log(`⏳ Server busy, waiting ${waitTime/1000}s before retry...`)
+            setError(`⏳ Server is busy. Retrying in ${waitTime/1000}s... (attempt ${attempt + 1}/${maxRetries})`)
+            await new Promise(r => setTimeout(r, waitTime))
+            setError('') // Clear message before retry
+            continue
+          }
+          
+          // If not retryable or last attempt, throw user-friendly error
+          if (isOverloaded) {
+            throw new Error('🔴 Gemini server is overloaded. Please wait 1-2 minutes and try again.')
+          } else if (isTimeout) {
+            throw new Error('⏱️ Request timed out. Please try again.')
+          }
+          throw err
+        }
+      }
+      
+      if (!response) {
+        throw lastError || new Error('Failed to generate ad after multiple attempts')
+      }
+      
+      setError('') // Clear any retry messages
 
       const imagePart = response.candidates?.[0]?.content?.parts.find((part: any) => part.inlineData)
       if (!imagePart?.inlineData) {
@@ -493,11 +697,192 @@ Generate a professional, eye-catching ad image.`
           console.warn('Failed to increment usage count:', error)
         }
       }
+
+      // Deduct tokens after successful generation
+      console.log(`💳 Deducting ${AD_TOKEN_COST} token(s) for ad generation...`)
+      const { success, balanceAfter } = await tokens.deductTokens(
+        user.id,
+        AD_TOKEN_COST,
+        'Generated Instagram/Facebook ad'
+      )
+      
+      if (success) {
+        console.log(`✅ Tokens deducted. Balance: ${balanceAfter}`)
+        notifyTokenUpdate() // Notify UI to refresh token display
+      } else {
+        console.warn('⚠️ Token deduction failed but image was generated')
+      }
+
+      // Save generated ad to storage and database
+      let finalImageUrl = generatedImageUrl
+      try {
+        console.log('💾 Saving generated ad to storage...')
+        const response = await fetch(generatedImageUrl)
+        const blob = await response.blob()
+        const fileName = `ad_${selectedAdType}_${Date.now()}.png`
+        const file = new File([blob], fileName, { type: 'image/png' })
+        
+        const { url: publicUrl, error: uploadError } = await storage.uploadImage(
+          'generated-ads', 
+          `${user.id}/${fileName}`, 
+          file
+        )
+        
+        if (uploadError) {
+          console.error('Storage upload error:', uploadError)
+          // Still use the base64 URL if storage fails
+        } else {
+          console.log('✅ Ad saved to storage:', publicUrl)
+          finalImageUrl = publicUrl || generatedImageUrl
+        }
+      } catch (saveErr) {
+        console.error('Error saving to storage:', saveErr)
+        // Continue with base64 URL
+      }
+
+      // ALWAYS save to ai_generated_content table for gallery (even if storage fails)
+      try {
+        console.log('💾 Saving to ai_generated_content table...')
+        const saveResult = await aiGeneratedContent.saveContent({
+          userId: user.id,
+          contentType: 'instagram_ad',
+          title: 'Instagram Ad',
+          imageUrl: finalImageUrl,
+          prompt: prompt,
+          generationSettings: {
+            platform: selectedAdType,
+            aspectRatio: aspectRatio,
+            brandProfileId: activeProfileId
+          },
+          contentData: {
+            adType: selectedAdType,
+            aspectRatio: aspectRatio
+          }
+        })
+        
+        if (saveResult.error) {
+          console.error('❌ Error saving to ai_generated_content:', saveResult.error)
+        } else {
+          console.log('✅ Ad saved to ai_generated_content:', saveResult.data?.id)
+        }
+      } catch (dbErr) {
+        console.error('❌ Database save error:', dbErr)
+      }
+
+      // Auto-generate caption in background (don't block UI)
+      console.log('📝 Auto-generating caption...')
+      setGeneratingCaption(true)
+      generateSocialMediaCaptions({
+        imageUrl: generatedImageUrl,
+        clothingDescription: prompt,
+        userId: user.id,
+        instagramOptions: {
+          tone: 'medium',
+          length: 'medium',
+          hashtags: true
+        }
+      }).then((captions) => {
+        console.log('✅ Caption generated successfully')
+        setGeneratedCaption(captions.instagram || '')
+        setGeneratingCaption(false)
+        // Auto-switch to preview tab when caption is ready
+        setActiveTab('preview')
+      }).catch((captionErr) => {
+        console.error('⚠️ Caption generation failed:', captionErr)
+        setGeneratingCaption(false)
+        // Still switch to preview even if caption fails
+        setActiveTab('preview')
+      })
+
     } catch (err: any) {
       console.error('Error generating ad:', err)
       setError(err.message || 'Failed to generate ad. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Load Meta connections for schedule functionality
+  useEffect(() => {
+    const loadMetaConnections = async () => {
+      if (!user) return
+      try {
+        const { data: connections, error } = await meta.getConnections(user.id)
+        if (!error && connections) {
+          setMetaConnections(connections)
+        }
+      } catch (error) {
+        console.error('Error loading Meta connections:', error)
+      }
+    }
+    loadMetaConnections()
+  }, [user])
+
+  // Set default schedule date to tomorrow
+  useEffect(() => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    setScheduleDate(tomorrow.toISOString().split('T')[0])
+  }, [])
+
+  // Handle schedule post
+  const handleSchedulePost = async () => {
+    if (!generatedAd || !scheduleDate || !scheduleConnectionId || !user || !selectedAdType) {
+      alert('Please fill in all required fields')
+      return
+    }
+
+    setScheduling(true)
+    try {
+      const [hours, minutes] = scheduleTime.split(':').map(Number)
+      const scheduledDateTime = new Date(scheduleDate)
+      scheduledDateTime.setHours(hours, minutes, 0, 0)
+
+      // First, save to database
+      const { data: savedPost, error: saveError } = await meta.schedulePost(user.id, {
+        meta_connection_id: scheduleConnectionId,
+        platform: selectedAdType,
+        image_url: generatedAd,
+        caption: generatedCaption || '',
+        scheduled_at: scheduledDateTime.toISOString()
+      })
+
+      if (saveError) throw saveError
+
+      // Then, schedule via Meta API
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not authenticated')
+
+      const scheduleResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-schedule-post`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+          },
+          body: JSON.stringify({
+            connectionId: scheduleConnectionId,
+            imageUrl: generatedAd,
+            caption: generatedCaption || '',
+            scheduledAt: scheduledDateTime.toISOString(),
+            platform: selectedAdType
+          })
+        }
+      )
+
+      if (!scheduleResponse.ok) {
+        const errorData = await scheduleResponse.json()
+        throw new Error(errorData.error || 'Failed to schedule post')
+      }
+
+      alert('Post scheduled successfully!')
+    } catch (error: any) {
+      console.error('Error scheduling post:', error)
+      alert('Failed to schedule post: ' + error.message)
+    } finally {
+      setScheduling(false)
     }
   }
 
@@ -859,6 +1244,8 @@ Generate a professional, eye-catching ad image.`
                   setImageFile(null)
                   setPrompt('')
                   setGeneratedAd(null)
+                  setGeneratedCaption('')
+                  setActiveTab('create')
                 } else {
                   // Going back to dashboard - clear saved ad type
                   safeLocalStorage.removeItem('marketing_selectedAdType')
@@ -880,9 +1267,64 @@ Generate a professional, eye-catching ad image.`
           </div>
         </div>
 
-        <div className="marketing-grid">
-          {/* LEFT SIDE: CONTROLS */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Tabs */}
+        {selectedAdType && (
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '20px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            paddingBottom: '0'
+          }}>
+            <button
+              onClick={() => setActiveTab('create')}
+              style={{
+                padding: '10px 20px',
+                background: activeTab === 'create' ? 'rgba(102, 126, 234, 0.2)' : 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'create' ? '2px solid #667eea' : '2px solid transparent',
+                color: activeTab === 'create' ? '#fff' : 'rgba(255,255,255,0.6)',
+                fontSize: '13px',
+                fontWeight: activeTab === 'create' ? '600' : '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                borderRadius: '8px 8px 0 0'
+              }}
+            >
+              Create Ad
+            </button>
+            <button
+              onClick={() => {
+                if (generatedAd) {
+                  setActiveTab('preview')
+                } else {
+                  alert('Please generate an ad first')
+                }
+              }}
+              disabled={!generatedAd}
+              style={{
+                padding: '10px 20px',
+                background: activeTab === 'preview' ? 'rgba(102, 126, 234, 0.2)' : 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'preview' ? '2px solid #667eea' : '2px solid transparent',
+                color: activeTab === 'preview' ? '#fff' : (!generatedAd ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.6)'),
+                fontSize: '13px',
+                fontWeight: activeTab === 'preview' ? '600' : '500',
+                cursor: !generatedAd ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s',
+                borderRadius: '8px 8px 0 0',
+                opacity: !generatedAd ? 0.5 : 1
+              }}
+            >
+              Preview & Schedule {generatingCaption && '✨'}
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'create' ? (
+          <div className="marketing-grid">
+            {/* LEFT SIDE: CONTROLS */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
             {/* 1. Upload Image */}
             <div style={{
@@ -1014,7 +1456,7 @@ Generate a professional, eye-catching ad image.`
               )}
             </div>
 
-            {/* 2. Ad Requirements */}
+            {/* 2. Choose Design Template (Optional) */}
             <div style={{
               background: 'rgba(0, 0, 0, 0.4)',
               borderRadius: '24px',
@@ -1025,7 +1467,138 @@ Generate a professional, eye-catching ad image.`
               boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>2. Ad Requirements</h3>
+                <h3 style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
+                  2. Design Template <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '400', textTransform: 'none' }}>(optional)</span>
+                </h3>
+                {selectedTemplate && (
+                  <button
+                    onClick={() => setSelectedTemplate(null)}
+                    style={{
+                      padding: '4px 10px',
+                      background: 'rgba(220, 38, 38, 0.2)',
+                      color: '#ef4444',
+                      border: '1px solid rgba(220, 38, 38, 0.3)',
+                      borderRadius: '6px',
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    ✕ Remove
+                  </button>
+                )}
+              </div>
+              
+              {selectedTemplate ? (
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '12px', 
+                  alignItems: 'center',
+                  background: 'rgba(102, 126, 234, 0.1)',
+                  border: '1px solid rgba(102, 126, 234, 0.3)',
+                  borderRadius: '12px',
+                  padding: '12px'
+                }}>
+                  <img 
+                    src={selectedTemplate.src} 
+                    alt={selectedTemplate.name}
+                    style={{
+                      width: '60px',
+                      height: selectedTemplate.ratio === '4:5' ? '75px' : '60px',
+                      objectFit: 'cover',
+                      borderRadius: '8px',
+                      border: '2px solid rgba(102, 126, 234, 0.5)'
+                    }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ 
+                      fontSize: '13px', 
+                      fontWeight: '600', 
+                      color: '#fff',
+                      margin: '0 0 4px 0'
+                    }}>
+                      {selectedTemplate.name}
+                    </p>
+                    <p style={{ 
+                      fontSize: '11px', 
+                      color: 'rgba(255,255,255,0.5)',
+                      margin: 0
+                    }}>
+                      {selectedTemplate.ratio} ratio • AI will match this style
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowTemplatePicker(true)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'rgba(102, 126, 234, 0.2)',
+                      color: '#667eea',
+                      border: '1px solid rgba(102, 126, 234, 0.3)',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowTemplatePicker(true)}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    border: '2px dashed rgba(255, 255, 255, 0.2)',
+                    borderRadius: '12px',
+                    color: 'rgba(255,255,255,0.6)',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
+                    e.currentTarget.style.background = 'rgba(102, 126, 234, 0.1)'
+                    e.currentTarget.style.color = '#667eea'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                    e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)'
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.6)'
+                  }}
+                >
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                  </svg>
+                  <span>Choose Design Template</span>
+                  <span style={{ fontSize: '11px', opacity: 0.7 }}>AI will create your ad matching the selected design style</span>
+                </button>
+              )}
+            </div>
+
+            {/* 3. Ad Requirements */}
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.4)',
+              borderRadius: '24px',
+              padding: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>3. Ad Requirements</h3>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     onClick={generateExample}
@@ -1123,7 +1696,7 @@ Generate a professional, eye-catching ad image.`
               />
             </div>
 
-            {/* 3. Aspect Ratio Selection */}
+            {/* 4. Aspect Ratio Selection */}
             {selectedAdType === 'instagram' && (
               <div style={{
                 background: 'rgba(0, 0, 0, 0.4)',
@@ -1134,7 +1707,7 @@ Generate a professional, eye-catching ad image.`
                 WebkitBackdropFilter: 'blur(20px)',
                 boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
               }}>
-                <h3 style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', margin: '0 0 12px 0' }}>3. Aspect Ratio</h3>
+                <h3 style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', margin: '0 0 12px 0' }}>4. Aspect Ratio</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                   {(['4:5', '9:16', '16:9', '1:1'] as const).map((ratio) => (
                     <button
@@ -1272,8 +1845,12 @@ Generate a professional, eye-catching ad image.`
                   margin: '0 auto 24px',
                   animation: 'spin 1s linear infinite'
                 }}></div>
-                <p style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Creating your ad...</p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>This may take 15-60 seconds</p>
+                <p style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>
+                  {error && error.includes('Retrying') ? error : 'Creating your ad...'}
+                </p>
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>
+                  {error && error.includes('Retrying') ? 'Server is busy, please wait...' : 'This may take 15-60 seconds'}
+                </p>
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
               </div>
             ) : generatedAd ? (
@@ -1542,7 +2119,596 @@ Generate a professional, eye-catching ad image.`
             )}
           </div>
         </div>
+        ) : (
+          /* PREVIEW TAB */
+          generatedAd && (
+            <div className="marketing-grid">
+              {/* LEFT SIDE: Caption & Schedule */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Generated Ad Preview */}
+                <div style={{
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  borderRadius: '20px',
+                  padding: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
+                }}>
+                  <h3 style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', margin: '0 0 8px 0' }}>Generated Ad</h3>
+                  <img 
+                    src={generatedAd} 
+                    alt="Generated ad" 
+                    style={{ 
+                      width: '100%',
+                      maxHeight: '200px',
+                      objectFit: 'contain',
+                      borderRadius: '10px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                      border: '1px solid rgba(255,255,255,0.1)'
+                    }} 
+                  />
+                </div>
+
+                {/* Caption */}
+                <div style={{
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  borderRadius: '20px',
+                  padding: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <h3 style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Caption</h3>
+                    {generatingCaption && (
+                      <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>Generating...</span>
+                    )}
+                  </div>
+                  <textarea
+                    value={generatedCaption}
+                    onChange={(e) => setGeneratedCaption(e.target.value)}
+                    placeholder={generatingCaption ? "✨ Generating caption with AI..." : "Enter your caption here..."}
+                    style={{
+                      width: '100%',
+                      height: '80px',
+                      padding: '8px',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      lineHeight: '1.5',
+                      resize: 'none',
+                      outline: 'none',
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      color: 'rgba(255,255,255,0.9)',
+                      transition: 'all 0.2s',
+                      fontFamily: 'inherit'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                      e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                      e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)'
+                    }}
+                  />
+                  <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
+                    {generatedCaption.length} characters
+                  </div>
+                </div>
+
+                {/* Schedule Section */}
+                {metaConnections.length > 0 ? (
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.4)',
+                    borderRadius: '20px',
+                    padding: '12px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
+                  }}>
+                    <h3 style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', margin: '0 0 10px 0' }}>Schedule Post</h3>
+                    
+                    {/* Date */}
+                    <div style={{ marginBottom: '8px' }}>
+                      <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '4px' }}>Date</label>
+                      <input
+                        type="date"
+                        value={scheduleDate}
+                        onChange={(e) => setScheduleDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                        style={{
+                          width: '100%',
+                          padding: '6px',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          background: 'rgba(0, 0, 0, 0.2)',
+                          color: 'rgba(255,255,255,0.9)',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+
+                    {/* Time */}
+                    <div style={{ marginBottom: '8px' }}>
+                      <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '4px' }}>Time</label>
+                      <input
+                        type="time"
+                        value={scheduleTime}
+                        onChange={(e) => setScheduleTime(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '6px',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          background: 'rgba(0, 0, 0, 0.2)',
+                          color: 'rgba(255,255,255,0.9)',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+
+                    {/* Connection */}
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: '4px' }}>Account</label>
+                      <select
+                        value={scheduleConnectionId}
+                        onChange={(e) => setScheduleConnectionId(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '6px',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          background: 'rgba(0, 0, 0, 0.2)',
+                          color: 'rgba(255,255,255,0.9)',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="">Select account...</option>
+                        {metaConnections
+                          .filter(c => c.platform === selectedAdType)
+                          .map((connection) => (
+                            <option key={connection.id} value={connection.id}>
+                              {connection.name || connection.page_name || 'Connected Account'} ({connection.platform})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    {/* Schedule Button */}
+                    <button
+                      onClick={handleSchedulePost}
+                      disabled={scheduling || !scheduleDate || !scheduleTime || !scheduleConnectionId}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        background: scheduling || !scheduleDate || !scheduleTime || !scheduleConnectionId
+                          ? 'rgba(0, 0, 0, 0.2)'
+                          : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: scheduling || !scheduleDate || !scheduleTime || !scheduleConnectionId
+                          ? 'rgba(255,255,255,0.4)'
+                          : '#fff',
+                        border: 'none',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: scheduling || !scheduleDate || !scheduleTime || !scheduleConnectionId
+                          ? 'not-allowed'
+                          : 'pointer',
+                        borderRadius: '8px',
+                        transition: 'all 0.2s',
+                        boxShadow: scheduling || !scheduleDate || !scheduleTime || !scheduleConnectionId
+                          ? 'none'
+                          : '0 4px 12px rgba(102, 126, 234, 0.3)',
+                        backdropFilter: 'blur(10px)'
+                      }}
+                    >
+                      {scheduling ? '⏳ Scheduling...' : '📅 Schedule Post'}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.4)',
+                    borderRadius: '24px',
+                    padding: '16px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+                    textAlign: 'center'
+                  }}>
+                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '12px' }}>
+                      Connect your {selectedAdType} account to schedule posts
+                    </p>
+                    <button
+                      onClick={() => onNavigate('meta-connect')}
+                      style={{
+                        padding: '10px 20px',
+                        background: 'rgba(102, 126, 234, 0.2)',
+                        color: '#667eea',
+                        border: '1px solid rgba(102, 126, 234, 0.3)',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      Connect Account
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* RIGHT SIDE: Preview */}
+              <div style={{ 
+                background: 'rgba(0, 0, 0, 0.4)', 
+                borderRadius: '20px', 
+                display: 'flex', 
+                flexDirection: 'column',
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                padding: '16px',
+                position: 'relative', 
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+                overflow: 'auto',
+                maxHeight: 'calc(100vh - 200px)'
+              }}>
+                <div style={{ 
+                  width: '100%',
+                  maxWidth: '400px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  {/* Instagram-like preview */}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#fff',
+                        fontWeight: '700',
+                        fontSize: '12px'
+                      }}>
+                        {selectedAdType === 'instagram' ? '📷' : '👤'}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: '600' }}>Your Account</div>
+                        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)' }}>Just now</div>
+                      </div>
+                    </div>
+                    <img 
+                      src={generatedAd} 
+                      alt="Preview" 
+                      style={{ 
+                        width: '100%',
+                        borderRadius: '8px',
+                        marginBottom: '10px'
+                      }} 
+                    />
+                    {generatedCaption && (
+                      <div style={{ fontSize: '12px', lineHeight: '1.5', color: 'rgba(255,255,255,0.9)' }}>
+                        {generatedCaption}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        )}
       </div>
+
+      {/* Template Picker Modal */}
+      {showTemplatePicker && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setShowTemplatePicker(false)}
+        >
+          <div 
+            style={{
+              background: 'linear-gradient(145deg, rgba(30, 30, 40, 0.98) 0%, rgba(20, 20, 30, 0.98) 100%)',
+              borderRadius: '24px',
+              width: '100%',
+              maxWidth: '900px',
+              maxHeight: '85vh',
+              overflow: 'hidden',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 25px 80px rgba(0, 0, 0, 0.5)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h2 style={{ 
+                  fontSize: '20px', 
+                  fontWeight: '700', 
+                  margin: 0,
+                  letterSpacing: '-0.5px'
+                }}>
+                  Choose Design Template
+                </h2>
+                <p style={{ 
+                  fontSize: '13px', 
+                  color: 'rgba(255,255,255,0.5)', 
+                  margin: '4px 0 0 0' 
+                }}>
+                  AI will create your ad matching the selected design style
+                </p>
+              </div>
+              <button
+                onClick={() => setShowTemplatePicker(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  color: '#fff',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              padding: '16px 24px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+            }}>
+              {(['4:5', '1:1'] as const).map((ratio) => (
+                <button
+                  key={ratio}
+                  onClick={() => setTemplatePickerTab(ratio)}
+                  style={{
+                    padding: '10px 20px',
+                    background: templatePickerTab === ratio 
+                      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                      : 'rgba(255, 255, 255, 0.05)',
+                    border: 'none',
+                    borderRadius: '10px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (templatePickerTab !== ratio) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (templatePickerTab !== ratio) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                    }
+                  }}
+                >
+                  <span style={{ 
+                    width: ratio === '4:5' ? '14px' : '16px', 
+                    height: ratio === '4:5' ? '18px' : '16px', 
+                    background: 'rgba(255,255,255,0.3)', 
+                    borderRadius: '2px',
+                    display: 'inline-block'
+                  }}></span>
+                  {ratio === '4:5' ? 'Portrait (4:5)' : 'Square (1:1)'}
+                  <span style={{ 
+                    fontSize: '11px', 
+                    opacity: 0.7,
+                    background: 'rgba(0,0,0,0.2)',
+                    padding: '2px 6px',
+                    borderRadius: '4px'
+                  }}>
+                    {ratio === '4:5' ? '23' : '8'}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Templates Grid */}
+            <div style={{
+              padding: '20px 24px',
+              overflowY: 'auto',
+              maxHeight: 'calc(85vh - 180px)'
+            }}>
+              {/* No Template Option */}
+              <div style={{ marginBottom: '20px' }}>
+                <button
+                  onClick={() => {
+                    setSelectedTemplate(null)
+                    setShowTemplatePicker(false)
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    background: !selectedTemplate 
+                      ? 'rgba(102, 126, 234, 0.2)' 
+                      : 'rgba(255, 255, 255, 0.05)',
+                    border: !selectedTemplate 
+                      ? '2px solid rgba(102, 126, 234, 0.5)' 
+                      : '2px dashed rgba(255, 255, 255, 0.2)',
+                    borderRadius: '12px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedTemplate) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedTemplate) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                    }
+                  }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                  </svg>
+                  No Template - Let AI Design Freely
+                </button>
+              </div>
+
+              {/* Templates */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: templatePickerTab === '4:5' 
+                  ? 'repeat(auto-fill, minmax(140px, 1fr))' 
+                  : 'repeat(auto-fill, minmax(160px, 1fr))',
+                gap: '16px'
+              }}>
+                {DESIGN_TEMPLATES[templatePickerTab].map((template) => (
+                  <button
+                    key={template.id}
+                    onClick={() => {
+                      setSelectedTemplate({ ...template, ratio: templatePickerTab })
+                      setAspectRatio(templatePickerTab === '4:5' ? '4:5' : '1:1')
+                      setShowTemplatePicker(false)
+                    }}
+                    style={{
+                      background: selectedTemplate?.id === template.id 
+                        ? 'rgba(102, 126, 234, 0.2)' 
+                        : 'rgba(255, 255, 255, 0.03)',
+                      border: selectedTemplate?.id === template.id 
+                        ? '2px solid rgba(102, 126, 234, 0.6)' 
+                        : '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      padding: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedTemplate?.id !== template.id) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedTemplate?.id !== template.id) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                        e.currentTarget.style.transform = 'translateY(0)'
+                      }
+                    }}
+                  >
+                    <div style={{
+                      width: '100%',
+                      aspectRatio: templatePickerTab === '4:5' ? '4/5' : '1/1',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      position: 'relative'
+                    }}>
+                      <img 
+                        src={template.src}
+                        alt={template.name}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                      {selectedTemplate?.id === template.id && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '8px',
+                          right: '8px',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          borderRadius: '50%',
+                          width: '24px',
+                          height: '24px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '14px'
+                        }}>
+                          ✓
+                        </div>
+                      )}
+                    </div>
+                    <span style={{ 
+                      fontSize: '11px', 
+                      fontWeight: '500',
+                      color: selectedTemplate?.id === template.id ? '#fff' : 'rgba(255,255,255,0.7)',
+                      textAlign: 'center'
+                    }}>
+                      {template.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

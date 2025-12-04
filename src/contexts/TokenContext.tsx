@@ -17,59 +17,60 @@ interface TokenContextType {
   refreshTokens: () => Promise<void>
 }
 
+const defaultTokenData: TokenData = {
+  tokens_remaining: 0,
+  tokens_limit: 0,
+  tokens_used: 0,
+  plan_type: 'free',
+  status: 'active',
+  period_end: new Date()
+}
+
 const TokenContext = createContext<TokenContextType | undefined>(undefined)
 
 export const TokenProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth()
-  const [tokenData, setTokenData] = useState<TokenData>({
-    tokens_remaining: 0,
-    tokens_limit: 0,
-    tokens_used: 0,
-    plan_type: 'free',
-    status: 'active',
-    period_end: new Date()
-  })
+  const [tokenData, setTokenData] = useState<TokenData>(defaultTokenData)
   const [loading, setLoading] = useState(false)
 
   const refreshTokens = useCallback(async () => {
-    if (!user) return
+    if (!user?.id) return
 
     setLoading(true)
     try {
-      console.log('🔄 Refreshing tokens for user:', user.id)
       const data = await tokens.getUserTokens(user.id)
-      console.log('📊 Token data received:', data)
       setTokenData({
         ...data,
         period_end: new Date(data.period_end)
       })
-      console.log('✅ Token data updated in state')
     } catch (error) {
       console.error('Error loading tokens:', error)
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user?.id])
 
+  // Load tokens when user changes
   useEffect(() => {
+    if (user?.id) {
     refreshTokens()
-  }, [refreshTokens])
+    } else {
+      setTokenData(defaultTokenData)
+    }
+  }, [user?.id, refreshTokens])
 
   // Listen for token update events
   useEffect(() => {
-    const handleTokenUpdate = async () => {
-      console.log('🔄 Token update event received - refreshing tokens...')
-      // Add small delay to ensure database is updated
-      await new Promise(resolve => setTimeout(resolve, 100))
-      await refreshTokens()
-      console.log('✅ Tokens refreshed')
+    const handleTokenUpdate = () => {
+      if (user?.id) {
+        // Small delay to ensure DB is updated
+        setTimeout(() => refreshTokens(), 300)
+      }
     }
 
     window.addEventListener('tokens-updated', handleTokenUpdate)
-    return () => {
-      window.removeEventListener('tokens-updated', handleTokenUpdate)
-    }
-  }, [refreshTokens])
+    return () => window.removeEventListener('tokens-updated', handleTokenUpdate)
+  }, [user?.id, refreshTokens])
 
   return (
     <TokenContext.Provider value={{ tokenData, loading, refreshTokens }}>
@@ -90,4 +91,3 @@ export const useTokens = () => {
 export const notifyTokenUpdate = () => {
   window.dispatchEvent(new Event('tokens-updated'))
 }
-

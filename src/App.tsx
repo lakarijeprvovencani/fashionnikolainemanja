@@ -3,12 +3,19 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { TokenProvider } from './contexts/TokenContext'
 import Login from './components/Login'
 import SignUp from './components/SignUp'
-import Dashboard from './components/Dashboard'
+import ForgotPassword from './components/ForgotPassword'
+import DashboardNovo from './components/DashboardNovo'
 import TokenCounter from './components/TokenCounter'
+import MetaCallback from './pages/MetaCallback'
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth()
-  const [isSignUp, setIsSignUp] = useState(false)
+  const [authView, setAuthView] = useState<'login' | 'signup' | 'forgot'>('login')
+
+  // Check for Meta OAuth callback
+  if (window.location.pathname === '/meta-callback') {
+    return <MetaCallback />
+  }
 
   if (loading) {
     return (
@@ -24,8 +31,7 @@ const AppContent: React.FC = () => {
   if (user) {
     return (
       <>
-        <Dashboard />
-        {/* Token Counter - Fixed bottom right corner, visible on all pages */}
+        <DashboardNovo onNavigate={() => {}} />
         <div style={{
           position: 'fixed',
           bottom: '30px',
@@ -39,11 +45,20 @@ const AppContent: React.FC = () => {
     )
   }
 
-  if (isSignUp) {
-    return <SignUp onSwitchToLogin={() => setIsSignUp(false)} />
+  if (authView === 'signup') {
+    return <SignUp onSwitchToLogin={() => setAuthView('login')} />
   }
 
-  return <Login onSwitchToSignUp={() => setIsSignUp(true)} />
+  if (authView === 'forgot') {
+    return <ForgotPassword onBackToLogin={() => setAuthView('login')} />
+  }
+
+  return (
+    <Login 
+      onSwitchToSignUp={() => setAuthView('signup')} 
+      onForgotPassword={() => setAuthView('forgot')}
+    />
+  )
 }
 
 const App: React.FC = () => {

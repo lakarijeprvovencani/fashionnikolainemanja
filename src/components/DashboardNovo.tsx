@@ -8,7 +8,7 @@ import CreateModelSelectNovo from './CreateModelSelectNovo'
 import DressModel from './DressModel'
 import DressModelNovo from './DressModelNovo'
 import Gallery from './Gallery'
-import GalleryNovo from './GalleryNovo'
+// GalleryNovo removed - using HistoryGalleryNovo instead
 import MarketingView from './MarketingView'
 import MarketingNovo from './MarketingNovo'
 import BrandMemoryMap from './BrandMemoryMap'
@@ -211,10 +211,17 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
     />
   }
 
+  // Gallery view now redirects to history-gallery
   if (internalView === 'gallery') {
-    return <GalleryNovo 
+    return <HistoryGalleryNovo 
       onBack={() => setInternalView('dashboard')}
-      onNavigate={onNavigate}
+      onNavigate={(view) => {
+        if (view === 'edit-image') {
+          setInternalView('edit-image')
+        } else {
+          onNavigate(view)
+        }
+      }}
     />
   }
 

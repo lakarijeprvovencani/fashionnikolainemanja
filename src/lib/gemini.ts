@@ -12,6 +12,60 @@ if (!API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: API_KEY })
 
+// Retry helper for handling 503 overloaded errors
+const withRetry = async <T>(
+  operation: () => Promise<T>,
+  operationName: string,
+  maxRetries: number = 3,
+  timeoutMs: number = 90000
+): Promise<T> => {
+  let lastError: any
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🚀 ${operationName} - Attempt ${attempt}/${maxRetries}...`)
+      
+      // Create timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Request timed out')), timeoutMs)
+      })
+      
+      // Race between operation and timeout
+      const result = await Promise.race([operation(), timeoutPromise])
+      console.log(`✅ ${operationName} - Success!`)
+      return result
+      
+    } catch (err: any) {
+      lastError = err
+      const errorMsg = err.message || err.toString() || ''
+      console.error(`❌ ${operationName} - Attempt ${attempt} failed:`, errorMsg)
+      
+      // Check if it's a retryable error (503 overloaded or timeout)
+      const isOverloaded = errorMsg.includes('503') || 
+                           errorMsg.includes('overloaded') || 
+                           errorMsg.includes('UNAVAILABLE')
+      const isTimeout = errorMsg.includes('timed out') || errorMsg.includes('timeout')
+      
+      if ((isOverloaded || isTimeout) && attempt < maxRetries) {
+        const waitTime = attempt * 5000 // Wait 5s, 10s, 15s
+        console.log(`⏳ Server busy, waiting ${waitTime/1000}s before retry...`)
+        await new Promise(r => setTimeout(r, waitTime))
+        continue
+      }
+      
+      // If not retryable or last attempt, throw user-friendly error
+      if (isOverloaded) {
+        throw new Error('🔴 Gemini server is overloaded. Please wait 1-2 minutes and try again.')
+      } else if (isTimeout) {
+        throw new Error('⏱️ Request timed out. Please try again.')
+      }
+      throw err
+    }
+  }
+  
+  throw lastError || new Error(`${operationName} failed after ${maxRetries} attempts`)
+}
+
 // Token costs for different operations
 export const TOKEN_COSTS = {
   createModel: 1,
@@ -49,8 +103,9 @@ export const generateFashionModel = async (options: GenerateModelOptions): Promi
     console.log('Generating model with prompt:', enhancedPrompt)
     
     // API poziv sa Gemini 3 Pro Image Preview (sa "Thinking" procesom i boljom konzistentnošću)
-    console.log('🚀 Using Gemini 3 Pro Image Preview with Thinking process')
-    const response = await ai.models.generateContent({
+    // Using retry wrapper to handle 503 overloaded errors
+    const response = await withRetry(
+      () => ai.models.generateContent({
       model: 'gemini-3-pro-image-preview',
       system: { parts: [{ text: systemInstructionText }] },
       contents: { parts: [{ text: enhancedPrompt }] },
@@ -61,9 +116,9 @@ export const generateFashionModel = async (options: GenerateModelOptions): Promi
           numberOfImages: 1
         }
       },
-    })
-    
-    console.log('API Response:', response)
+      }),
+      'Generate Fashion Model'
+    )
     
     // Pronalaženje slike u odgovoru
     const imagePart = response.candidates?.[0]?.content?.parts.find((part: any) => part.inlineData)
@@ -107,7 +162,9 @@ export const analyzeUploadedImage = async (imageFile: File): Promise<{
     
     const prompt = `Analyze this image for fashion modeling purposes. Describe the person's appearance, pose, and suitability for fashion modeling. Provide suggestions for how to best use this as a fashion model. Keep the response concise and professional.`
     
-    const response = await ai.models.generateContent({
+    // Using retry wrapper
+    const response = await withRetry(
+      () => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: { 
         parts: [
@@ -120,7 +177,11 @@ export const analyzeUploadedImage = async (imageFile: File): Promise<{
           }
         ]
       }
-    })
+      }),
+      'Analyze Uploaded Image',
+      2,
+      30000
+    )
     
     const text = response.candidates?.[0]?.content?.parts.find((part: any) => part.text)?.text || 'Analysis complete'
     
@@ -155,8 +216,9 @@ export const generateModelFromUploadedImage = async (imageFile: File): Promise<s
     const textPart = { text: transformPrompt }
     
     // API poziv sa Gemini 3 Pro Image Preview modelom koji podržava image input
-    console.log('🚀 Using Gemini 3 Pro Image Preview for image transformation')
-    const response = await ai.models.generateContent({
+    // Using retry wrapper to handle 503 overloaded errors
+    const response = await withRetry(
+      () => ai.models.generateContent({
       model: 'gemini-3-pro-image-preview',
       contents: { parts: [imagePart, textPart] },
       config: {
@@ -166,9 +228,9 @@ export const generateModelFromUploadedImage = async (imageFile: File): Promise<s
           numberOfImages: 1
         }
       }
-    })
-    
-    console.log('API Response:', JSON.stringify(response, null, 2))
+      }),
+      'Transform Uploaded Image'
+    )
     
     // Pronalaženje slike - proveravam sve moguće strukture
     let imageData = null
@@ -377,9 +439,9 @@ Step 4: Apply scene description for pose and background
 The person's identity MUST remain unchanged. Only clothing, pose, and scene can change.`
     
     // API call using Gemini 3 Pro Image Preview (professional quality with "Thinking" process)
-    console.log('🚀 Calling Gemini API with: Gemini 3 Pro Image Preview')
-    console.log('✨ Features: Thinking process, Real-world grounding, Up to 4K resolution')
-    const response = await ai.models.generateContent({
+    // Using retry wrapper to handle 503 overloaded errors
+    const response = await withRetry(
+      () => ai.models.generateContent({
       model: 'gemini-3-pro-image-preview',
       system: { parts: [{ text: systemInstructionText }] },
       contents: { parts: parts },
@@ -390,9 +452,9 @@ The person's identity MUST remain unchanged. Only clothing, pose, and scene can 
           numberOfImages: 1
         }
       },
-    })
-    
-    console.log('✅ API Response received')
+      }),
+      'Dress Model'
+    )
     
     // Extract image from response
     const imagePart = response.candidates?.[0]?.content?.parts.find((part: any) => part.inlineData)
@@ -600,10 +662,16 @@ Return the response in this exact JSON format:
 
     const textPart = { text: prompt }
     
-    const response_ai = await ai.models.generateContent({
+    // Using retry wrapper for caption generation
+    const response_ai = await withRetry(
+      () => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: { parts: [imagePart, textPart] },
-    })
+      }),
+      'Generate Social Media Captions',
+      2,
+      45000
+    )
     
     const textResponse = response_ai.candidates?.[0]?.content?.parts.find((part: any) => part.text)?.text || ''
     
@@ -707,10 +775,16 @@ ${context ? `Additional context: ${context}` : ''}
 
 Continue from where the user left off. Keep the same style and tone as the selected text. Complete the thought naturally and expand it according to the platform requirements. Return ONLY the continuation text (do not repeat the selected text, just continue from it).`
 
-    const response_ai = await ai.models.generateContent({
+    // Using retry wrapper
+    const response_ai = await withRetry(
+      () => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: { parts: [{ text: prompt }] },
-    })
+      }),
+      'Expand Text',
+      2,
+      30000
+    )
     
     const textResponse = response_ai.candidates?.[0]?.content?.parts.find((part: any) => part.text)?.text || ''
     
@@ -754,10 +828,16 @@ Respond in JSON format:
   "count": number
 }`
 
-    const analysisResponse = await ai.models.generateContent({
+    // Using retry wrapper for analysis
+    const analysisResponse = await withRetry(
+      () => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: { parts: [imagePart, { text: analysisPrompt }] },
-    })
+      }),
+      'Analyze Clothing Image',
+      2, // Only 2 retries for analysis
+      30000 // 30s timeout for analysis
+    )
     
     const analysisText = analysisResponse.candidates?.[0]?.content?.parts.find((part: any) => part.text)?.text || ''
     
@@ -799,7 +879,9 @@ CRITICAL REQUIREMENTS:
 Generate ONE image showing ONLY the ${item}.`
 
       try {
-        const extractionResponse = await ai.models.generateContent({
+        // Using retry wrapper for extraction
+        const extractionResponse = await withRetry(
+          () => ai.models.generateContent({
           model: 'gemini-3-pro-image-preview',
           contents: { parts: [imagePart, { text: extractionPrompt }] },
           config: {
@@ -808,7 +890,11 @@ Generate ONE image showing ONLY the ${item}.`
               numberOfImages: 1
             }
           }
-        })
+          }),
+          `Extract ${item}`,
+          2, // Only 2 retries per item
+          60000 // 60s timeout
+        )
 
         // Extract the image from this response
         const candidate = extractionResponse.candidates?.[0]
@@ -843,7 +929,9 @@ Generate ONE image showing ONLY the ${item}.`
     // Fallback: try simpler extraction (just remove person, keep clothing)
     const simpleExtractionPrompt = `Extract only the clothing from this image. Remove the person's face, head, and body. Show only the clothing items on a neutral background.`
     
-    const simpleResponse = await ai.models.generateContent({
+    // Using retry wrapper for simple extraction
+    const simpleResponse = await withRetry(
+      () => ai.models.generateContent({
       model: 'gemini-3-pro-image-preview',
       contents: { parts: [imagePart, { text: simpleExtractionPrompt }] },
       config: {
@@ -852,7 +940,11 @@ Generate ONE image showing ONLY the ${item}.`
           numberOfImages: 1
         }
       }
-    })
+      }),
+      'Simple Clothing Extraction',
+      2,
+      60000
+    )
 
     const simpleImagePart = simpleResponse.candidates?.[0]?.content?.parts.find((part: any) => part.inlineData)
     if (simpleImagePart?.inlineData) {
@@ -904,7 +996,9 @@ export const editFashionImage = async (options: EditImageOptions): Promise<strin
     
     console.log('🎨 Editing image with prompt:', prompt)
     
-    const aiResponse = await ai.models.generateContent({
+    // Using retry wrapper to handle 503 overloaded errors
+    const aiResponse = await withRetry(
+      () => ai.models.generateContent({
       model: 'gemini-3-pro-image-preview',
       contents: { parts: [imagePart, textPart] },
       config: {
@@ -913,7 +1007,9 @@ export const editFashionImage = async (options: EditImageOptions): Promise<strin
           numberOfImages: 1
         }
       }
-    })
+      }),
+      'Edit Fashion Image'
+    )
     
     const imageResultPart = aiResponse.candidates?.[0]?.content?.parts.find((part: any) => part.inlineData)
     

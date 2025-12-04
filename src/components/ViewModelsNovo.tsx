@@ -32,6 +32,8 @@ const ViewModelsNovo: React.FC<ViewModelsNovoProps> = ({ onBack, onSelectModel, 
 
   const loadModels = async () => {
     if (!user) return
+    setLoading(true)
+    console.log('📂 Loading models for user:', user.id)
     try {
       const { data, error } = await supabase
         .from('fashion_models')
@@ -40,15 +42,26 @@ const ViewModelsNovo: React.FC<ViewModelsNovoProps> = ({ onBack, onSelectModel, 
         .eq('status', 'completed')
         .order('created_at', { ascending: false })
       
-      if (error) throw error
+      if (error) {
+        console.error('❌ Error loading models:', error)
+        throw error
+      }
+      
+      console.log('✅ Models loaded:', data?.length || 0, 'models')
+      console.log('📋 Models data:', data)
       setModels(data || [])
     } catch (err: any) {
-      console.error('Error loading models:', err)
+      console.error('❌ Error loading models:', err)
       setError(err.message)
     } finally {
       setLoading(false)
     }
   }
+  
+  // Reload models when component becomes visible
+  useEffect(() => {
+    loadModels()
+  }, [])
 
   const deleteModel = async (modelId: string, e: React.MouseEvent) => {
     e.stopPropagation()

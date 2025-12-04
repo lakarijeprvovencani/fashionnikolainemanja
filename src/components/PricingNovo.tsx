@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { notifyTokenUpdate } from '../contexts/TokenContext'
 import { subscriptions } from '../lib/supabase'
 
 interface PricingNovoProps {
@@ -42,6 +43,8 @@ const PricingNovo: React.FC<PricingNovoProps> = ({ onBack, onSuccess, onNavigate
       const { success, error } = await subscriptions.activateSubscription(user.id, planId)
       
       if (success) {
+        // Refresh tokens immediately after subscription
+        notifyTokenUpdate()
         alert('🎉 Subscription activated successfully! (Demo Mode)')
         if (onSuccess) onSuccess()
       } else {
@@ -347,4 +350,5 @@ const PricingNovo: React.FC<PricingNovoProps> = ({ onBack, onSuccess, onNavigate
 }
 
 export default PricingNovo
+
 

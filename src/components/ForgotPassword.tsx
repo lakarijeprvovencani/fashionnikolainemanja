@@ -1,45 +1,30 @@
 import React, { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 
-interface SignUpProps {
-  onSwitchToLogin: () => void
+interface ForgotPasswordProps {
+  onBackToLogin: () => void
 }
 
-const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
+const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBackToLogin }) => {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const { signUp } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
-    setSuccess(false)
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match')
-      setLoading(false)
-      return
-    }
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
-      setLoading(false)
-      return
-    }
 
     try {
-      const { error } = await signUp(email, password, fullName)
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      })
+      
       if (error) {
         setError(error.message)
       } else {
         setSuccess(true)
-        setError('')
       }
     } catch (err) {
       setError('An unexpected error occurred')
@@ -49,10 +34,10 @@ const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
   }
 
   const containerStyle: React.CSSProperties = {
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
     padding: '20px',
     position: 'relative',
@@ -71,40 +56,6 @@ const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
     border: '1px solid rgba(255, 255, 255, 0.1)',
     position: 'relative',
     zIndex: 10
-  }
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '16px 18px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: '12px',
-    fontSize: '15px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    color: '#fff',
-    outline: 'none',
-    transition: 'all 0.3s ease',
-    boxSizing: 'border-box'
-  }
-
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: '13px',
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: '8px',
-    letterSpacing: '0.5px'
-  }
-
-  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.style.borderColor = 'rgba(236, 72, 153, 0.5)'
-    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(236, 72, 153, 0.1)'
-  }
-
-  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-    e.currentTarget.style.boxShadow = 'none'
   }
 
   if (success) {
@@ -143,34 +94,31 @@ const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
           `}
         </style>
 
-        <div style={{
-          ...cardStyle,
-          textAlign: 'center'
-        }}>
+        <div style={{ ...cardStyle, textAlign: 'center' }}>
           {/* Success Icon */}
           <div style={{
             width: '100px',
             height: '100px',
-            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
             borderRadius: '50%',
             margin: '0 auto 32px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 20px 40px -10px rgba(34, 197, 94, 0.5)',
+            boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.5)',
             position: 'relative'
           }}>
             <div style={{
               position: 'absolute',
               inset: '-3px',
-              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
               borderRadius: '50%',
               opacity: 0.4,
               filter: 'blur(15px)',
               zIndex: -1
             }} />
-            <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+              <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           </div>
           
@@ -193,12 +141,12 @@ const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
             marginBottom: '32px',
             lineHeight: '1.7'
           }}>
-            We've sent you a confirmation link.<br />
-            Please check your email and click the link to verify your account.
+            We've sent a password reset link to<br />
+            <span style={{ color: '#93c5fd', fontWeight: '500' }}>{email}</span>
           </p>
           
           <button
-            onClick={onSwitchToLogin}
+            onClick={onBackToLogin}
             style={{
               width: '100%',
               padding: '18px',
@@ -223,6 +171,20 @@ const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
           >
             Back to Sign In
           </button>
+          
+          <p style={{
+            marginTop: '24px',
+            fontSize: '13px',
+            color: 'rgba(255, 255, 255, 0.4)'
+          }}>
+            Didn't receive the email? Check your spam folder or{' '}
+            <span 
+              onClick={() => setSuccess(false)}
+              style={{ color: '#93c5fd', cursor: 'pointer' }}
+            >
+              try again
+            </span>
+          </p>
         </div>
       </div>
     )
@@ -242,7 +204,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
         filter: 'blur(60px)',
         animation: 'float 8s ease-in-out infinite'
       }} />
-    <div style={{
+      <div style={{
         position: 'absolute',
         bottom: '-20%',
         right: '-10%',
@@ -279,31 +241,61 @@ const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
       </style>
 
       <div style={cardStyle}>
-        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          {/* Back button */}
+          <button
+            onClick={onBackToLogin}
+            style={{
+              position: 'absolute',
+              top: '24px',
+              left: '24px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '10px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+          </button>
+
           {/* Logo */}
           <div style={{
             width: '80px',
             height: '80px',
-            background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #3b82f6 100%)',
+            background: 'linear-gradient(135deg, #f59e0b 0%, #ec4899 100%)',
             borderRadius: '20px',
             margin: '0 auto 28px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 20px 40px -10px rgba(236, 72, 153, 0.5)',
+            boxShadow: '0 20px 40px -10px rgba(245, 158, 11, 0.5)',
             position: 'relative'
           }}>
             <div style={{
               position: 'absolute',
               inset: '-2px',
-              background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #3b82f6 100%)',
+              background: 'linear-gradient(135deg, #f59e0b 0%, #ec4899 100%)',
               borderRadius: '22px',
               opacity: 0.5,
               filter: 'blur(10px)',
               zIndex: -1
             }} />
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0110 0v4"/>
             </svg>
           </div>
           
@@ -317,49 +309,31 @@ const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
             marginBottom: '12px',
             letterSpacing: '-0.5px'
           }}>
-            Create Account
+            Reset Password
           </h1>
           
           <p style={{
             fontSize: '15px',
             color: 'rgba(255, 255, 255, 0.6)',
-            marginBottom: '0'
+            marginBottom: '0',
+            lineHeight: '1.6'
           }}>
-            Already have an account?{' '}
-            <span
-              onClick={onSwitchToLogin}
-              style={{
-                background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                cursor: 'pointer',
-                fontWeight: '600'
-              }}
-            >
-              Sign in
-            </span>
+            Enter your email address and we'll send you a link to reset your password.
           </p>
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '18px' }}>
-            <label htmlFor="fullName" style={labelStyle}>Full Name</label>
-            <input
-              id="fullName"
-              type="text"
-              placeholder="Enter your full name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-              style={inputStyle}
-              onFocus={handleInputFocus}
-              onBlur={handleInputBlur}
-            />
-          </div>
-
-          <div style={{ marginBottom: '18px' }}>
-            <label htmlFor="email" style={labelStyle}>Email Address</label>
+          <div style={{ marginBottom: '24px' }}>
+            <label htmlFor="email" style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: 'rgba(255, 255, 255, 0.7)',
+              marginBottom: '8px',
+              letterSpacing: '0.5px'
+            }}>
+              Email Address
+            </label>
             <input
               id="email"
               type="email"
@@ -367,39 +341,28 @@ const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={inputStyle}
-              onFocus={handleInputFocus}
-              onBlur={handleInputBlur}
-            />
-          </div>
-
-          <div style={{ marginBottom: '18px' }}>
-            <label htmlFor="password" style={labelStyle}>Password</label>
-            <input
-              id="password"
-              type="password"
-              placeholder="Minimum 6 characters"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              style={inputStyle}
-              onFocus={handleInputFocus}
-              onBlur={handleInputBlur}
-            />
-          </div>
-
-          <div style={{ marginBottom: '24px' }}>
-            <label htmlFor="confirmPassword" style={labelStyle}>Confirm Password</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              placeholder="Confirm your password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              style={inputStyle}
-              onFocus={handleInputFocus}
-              onBlur={handleInputBlur}
+              style={{
+                width: '100%',
+                padding: '16px 18px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                fontSize: '15px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                color: '#fff',
+                outline: 'none',
+                transition: 'all 0.3s ease',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.5)'
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                e.currentTarget.style.boxShadow = '0 0 0 4px rgba(245, 158, 11, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
             />
           </div>
 
@@ -433,7 +396,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
               padding: '18px',
               background: loading 
                 ? 'rgba(255, 255, 255, 0.1)' 
-                : 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #3b82f6 100%)',
+                : 'linear-gradient(135deg, #f59e0b 0%, #ec4899 100%)',
               color: '#ffffff',
               border: 'none',
               borderRadius: '12px',
@@ -441,20 +404,20 @@ const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
               fontWeight: '600',
               cursor: loading ? 'not-allowed' : 'pointer',
               transition: 'all 0.3s ease',
-              boxShadow: loading ? 'none' : '0 10px 30px -10px rgba(236, 72, 153, 0.5)',
+              boxShadow: loading ? 'none' : '0 10px 30px -10px rgba(245, 158, 11, 0.5)',
               position: 'relative',
               overflow: 'hidden'
             }}
             onMouseEnter={(e) => {
               if (!loading) {
                 e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = '0 15px 40px -10px rgba(236, 72, 153, 0.6)'
+                e.currentTarget.style.boxShadow = '0 15px 40px -10px rgba(245, 158, 11, 0.6)'
               }
             }}
             onMouseLeave={(e) => {
               if (!loading) {
                 e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 10px 30px -10px rgba(236, 72, 153, 0.5)'
+                e.currentTarget.style.boxShadow = '0 10px 30px -10px rgba(245, 158, 11, 0.5)'
               }
             }}
           >
@@ -463,31 +426,39 @@ const SignUp: React.FC<SignUpProps> = ({ onSwitchToLogin }) => {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
                   <path d="M21 12a9 9 0 11-6.219-8.56"/>
                 </svg>
-                Creating account...
+                Sending...
               </span>
-            ) : 'Create Account'}
+            ) : 'Send Reset Link'}
           </button>
         </form>
 
-        {/* Free tier info */}
-        <div style={{
-          marginTop: '28px',
-          padding: '16px',
-          background: 'rgba(59, 130, 246, 0.1)',
-          borderRadius: '12px',
-          border: '1px solid rgba(59, 130, 246, 0.2)'
+        <p style={{
+          textAlign: 'center',
+          marginTop: '32px',
+          fontSize: '14px',
+          color: 'rgba(255, 255, 255, 0.5)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '18px' }}>🎁</span>
-            <span style={{ color: '#93c5fd', fontWeight: '600', fontSize: '14px' }}>Free Starter Pack</span>
-          </div>
-          <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '13px', margin: 0, lineHeight: '1.5' }}>
-            Get 1,000 tokens free when you sign up. Create AI models, dress them, and generate ads!
-          </p>
-        </div>
+          Remember your password?{' '}
+          <span
+            onClick={onBackToLogin}
+            style={{
+              background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              cursor: 'pointer',
+              fontWeight: '600'
+            }}
+          >
+            Sign in
+          </span>
+        </p>
       </div>
     </div>
   )
 }
 
-export default SignUp
+export default ForgotPassword
+
+
+

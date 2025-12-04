@@ -37,17 +37,17 @@ const TokenCounter: React.FC<TokenCounterProps> = ({ onRefresh }) => {
     if (num >= 1000000) {
       return `${(num / 1000000).toFixed(1)}M`
     }
-    if (num >= 1000) {
-      // Show more precision for numbers close to round thousands
+    // Only use K for numbers >= 10,000
+    if (num >= 10000) {
       const thousands = num / 1000
-      // If it's very close to a round number (like 99.999), show 3 decimals
-      if (thousands % 1 > 0.99 || thousands % 1 < 0.01) {
-        return `${thousands.toFixed(3)}K`
+      // Clean decimal if it's a round number
+      if (thousands % 1 === 0) {
+        return `${thousands.toFixed(0)}K`
       }
-      // Otherwise show 1 decimal
       return `${thousands.toFixed(1)}K`
     }
-    return num.toString()
+    // For numbers < 10,000, show full number with comma separator
+    return num.toLocaleString()
   }
 
   return (

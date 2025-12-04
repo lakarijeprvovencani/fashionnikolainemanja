@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
-import { supabase, auth } from '../lib/supabase'
+import { supabase, auth, ensureUserProfile } from '../lib/supabase'
 
 interface AuthContextType {
   user: User | null
@@ -25,25 +25,73 @@ interface AuthProviderProps {
   children: React.ReactNode
 }
 
+// Ensure user has profile and subscription - runs in background, doesn't block
+const ensureUserSetup = (userId: string, email: string) => {
+  // Run in background - don't await
+  (async () => {
+    try {
+      // 1. Ensure profile exists
+      await ensureUserProfile(userId, email)
+      
+      // 2. Check if subscription exists
+      const { data: existingSub } = await supabase
+        .from('subscriptions')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle()
+      
+      if (!existingSub) {
+        // Create free subscription with starter tokens
+        console.log('📦 Creating free subscription...')
+        const { error: subError } = await supabase
+          .from('subscriptions')
+          .insert({
+            user_id: userId,
+            plan_type: 'free',
+            tokens_limit: 1000,
+            tokens_used: 0,
+            status: 'active',
+            current_period_start: new Date().toISOString(),
+            current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          })
+        
+        if (subError) {
+          console.error('⚠️ Error creating subscription:', subError)
+        } else {
+          console.log('✅ Free subscription created')
+          window.dispatchEvent(new Event('tokens-updated'))
+        }
+      } else {
+        window.dispatchEvent(new Event('tokens-updated'))
+      }
+    } catch (error) {
+      console.error('⚠️ Error in user setup:', error)
+    }
+  })()
+}
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let mounted = true
+
     // Get initial session
     const getInitialSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        if (error) {
-          console.error('Error getting session:', error)
-        }
+        const { data: { session } } = await supabase.auth.getSession()
+        if (mounted) {
         setSession(session)
         setUser(session?.user ?? null)
+          setLoading(false)
+        }
       } catch (error) {
-        console.error('Error in getInitialSession:', error)
-      } finally {
+        console.error('Error getting session:', error)
+        if (mounted) {
         setLoading(false)
+        }
       }
     }
 
@@ -51,14 +99,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
+        if (mounted) {
         setSession(session)
         setUser(session?.user ?? null)
         setLoading(false)
+          
+          // On sign in or sign up, ensure profile and subscription exist (background)
+          if ((event === 'SIGNED_IN' || event === 'SIGNED_UP') && session?.user) {
+            ensureUserSetup(session.user.id, session.user.email || '')
+          }
+        }
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signUp = async (email: string, password: string, fullName: string) => {

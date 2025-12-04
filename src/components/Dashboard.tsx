@@ -62,6 +62,9 @@ const Dashboard: React.FC = () => {
       } finally {
         setLoading(false)
       }
+    } else {
+      // If no user, still finish loading to prevent infinite loading state
+      setLoading(false)
     }
   }
 

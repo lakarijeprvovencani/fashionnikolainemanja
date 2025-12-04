@@ -29,7 +29,7 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
   const [content, setContent] = useState<AIContent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [filter, setFilter] = useState<'all' | 'dressed_model' | 'instagram_ad' | 'facebook_ad' | 'video' | 'favorites'>('all')
+  const [filter, setFilter] = useState<'all' | 'dressed_model' | 'instagram_ad' | 'video' | 'favorites'>('all')
   const [selectedContent, setSelectedContent] = useState<AIContent | null>(null)
 
   useEffect(() => {
@@ -51,17 +51,15 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
       if (filter === 'favorites') {
         favoritesOnly = true
         // For favorites, get all relevant content types in parallel
-        const [dressedModelResult, instagramAdResult, facebookAdResult, videoResult] = await Promise.all([
+        const [dressedModelResult, instagramAdResult, videoResult] = await Promise.all([
           aiGeneratedContent.getUserContent(user.id, { contentType: 'dressed_model', favoritesOnly: true }),
           aiGeneratedContent.getUserContent(user.id, { contentType: 'instagram_ad', favoritesOnly: true }),
-          aiGeneratedContent.getUserContent(user.id, { contentType: 'facebook_ad', favoritesOnly: true }),
           aiGeneratedContent.getUserContent(user.id, { contentType: 'generated_video', favoritesOnly: true })
         ])
         
         const allFavorites = [
           ...(dressedModelResult.data || []),
           ...(instagramAdResult.data || []),
-          ...(facebookAdResult.data || []),
           ...(videoResult.data || [])
         ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         
@@ -72,23 +70,19 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
         contentType = 'dressed_model'
       } else if (filter === 'instagram_ad') {
         contentType = 'instagram_ad'
-      } else if (filter === 'facebook_ad') {
-        contentType = 'facebook_ad'
       } else if (filter === 'video') {
         contentType = 'generated_video'
       } else if (filter === 'all') {
         // For 'all', get all relevant content types in parallel
-        const [dressedModelResult, instagramAdResult, facebookAdResult, videoResult] = await Promise.all([
+        const [dressedModelResult, instagramAdResult, videoResult] = await Promise.all([
           aiGeneratedContent.getUserContent(user.id, { contentType: 'dressed_model' }),
           aiGeneratedContent.getUserContent(user.id, { contentType: 'instagram_ad' }),
-          aiGeneratedContent.getUserContent(user.id, { contentType: 'facebook_ad' }),
           aiGeneratedContent.getUserContent(user.id, { contentType: 'generated_video' })
         ])
         
         const allContent = [
           ...(dressedModelResult.data || []),
           ...(instagramAdResult.data || []),
-          ...(facebookAdResult.data || []),
           ...(videoResult.data || [])
         ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         
@@ -188,15 +182,6 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
       if (onNavigate) {
         onNavigate('edit-image')
       }
-    } else if (item.content_type === 'facebook_ad') {
-      // Save image for facebook ad edit
-      localStorage.setItem('facebook_ad_editImage', item.image_url)
-      localStorage.setItem('facebook_ad_generated', item.image_url)
-      localStorage.setItem('editImage_previousView', 'history-gallery')
-      localStorage.setItem('editImage_adType', 'facebook')
-      if (onNavigate) {
-        onNavigate('edit-image')
-      }
     } else {
       // For other types, default to dress-model edit
       localStorage.setItem('dressModel_generatedImage', item.image_url)
@@ -212,7 +197,6 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
     const labels: Record<string, string> = {
       'dressed_model': 'Dressed Model',
       'instagram_ad': 'Instagram Ad',
-      'facebook_ad': 'Facebook Ad',
       'generated_video': 'Video'
     }
     return labels[type] || type
@@ -221,7 +205,6 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
   const getContentTypeIcon = (type: string) => {
     if (type === 'dressed_model') return '👤'
     if (type === 'instagram_ad') return '📷'
-    if (type === 'facebook_ad') return '📘'
     if (type === 'generated_video') return '🎥'
     return '📄'
   }
@@ -397,7 +380,7 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
           marginBottom: '32px',
           flexWrap: 'wrap'
         }}>
-          {(['all', 'dressed_model', 'instagram_ad', 'facebook_ad', 'video', 'favorites'] as const).map((filterType) => (
+          {(['all', 'dressed_model', 'instagram_ad', 'video', 'favorites'] as const).map((filterType) => (
             <button
               key={filterType}
               onClick={() => setFilter(filterType)}
@@ -433,7 +416,6 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
                filterType === 'favorites' ? '⭐ Favorites' :
                filterType === 'dressed_model' ? 'Dressed Model' :
                filterType === 'instagram_ad' ? 'Instagram Ad' :
-               filterType === 'facebook_ad' ? 'Facebook Ad' :
                filterType === 'video' ? 'Video' :
                filterType.replace('_', ' ')}
             </button>

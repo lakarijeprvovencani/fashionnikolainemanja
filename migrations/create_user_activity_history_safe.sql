@@ -76,3 +76,4 @@ GRANT EXECUTE ON FUNCTION cleanup_old_activity_history TO authenticated;
 
 
 
+

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase, userHistory, aiGeneratedContent } from '../lib/supabase'
+import { supabase, userHistory, aiGeneratedContent, ensureUserProfile } from '../lib/supabase'
 import { generateFashionModel, generateModelFromUploadedImage } from '../lib/gemini'
 
 interface CreateModelNovoProps {
@@ -194,39 +194,70 @@ const CreateModelNovo: React.FC<CreateModelNovoProps> = ({ mode = 'ai', onBack, 
       return
     }
 
+    if (!user?.id) {
+      setError('You must be logged in to save a model')
+      return
+    }
+
+    if (!generatedModel?.imageUrl) {
+      setError('No model image to save')
+      return
+    }
+
     setLoading(true)
+    console.log('💾 Starting model save process...')
+    console.log('📋 Model name:', modelName)
+    console.log('👤 User ID:', user.id)
+    
     try {
+      // Ensure user profile exists (required for foreign key constraint)
+      console.log('👤 Checking/creating user profile...')
+      await ensureUserProfile(user.id, user.email)
+      console.log('✅ User profile ensured')
       let file: File
       
       // If it's a data URL (from crop or AI generation), convert to blob
       if (generatedModel.imageUrl.startsWith('data:')) {
+        console.log('📦 Converting data URL to blob...')
         const response = await fetch(generatedModel.imageUrl)
         const blob = await response.blob()
         file = new File([blob], 'model.png', { type: 'image/png' })
+        console.log('✅ Blob created, size:', blob.size)
       } else {
         // If it's already a URL, fetch it
+        console.log('📥 Fetching image from URL...')
         const response = await fetch(generatedModel.imageUrl)
         const blob = await response.blob()
         file = new File([blob], 'model.png', { type: 'image/png' })
+        console.log('✅ Blob created, size:', blob.size)
       }
       
       const fileName = `model_${Date.now()}.png`
+      const filePath = `${user.id}/${fileName}`
+      console.log('📤 Uploading to storage:', filePath)
+      
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('model-images')
-        .upload(`${user?.id}/${fileName}`, file)
+        .upload(filePath, file)
 
-      if (uploadError) throw uploadError
+      if (uploadError) {
+        console.error('❌ Storage upload error:', uploadError)
+        throw new Error(`Storage error: ${uploadError.message}`)
+      }
+      
+      console.log('✅ Storage upload success:', uploadData)
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('model-images')
-        .getPublicUrl(`${user?.id}/${fileName}`)
+        .getPublicUrl(filePath)
+      
+      console.log('🔗 Public URL:', publicUrl)
 
       // Save to database
-      const { error: dbError } = await supabase
-        .from('fashion_models')
-        .insert({
-          user_id: user?.id,
+      console.log('💾 Saving to database...')
+      const insertData = {
+        user_id: user.id,
           model_name: modelName,
           model_image_url: publicUrl,
           model_data: {
@@ -238,12 +269,23 @@ const CreateModelNovo: React.FC<CreateModelNovoProps> = ({ mode = 'ai', onBack, 
             type: mode === 'upload' ? 'uploaded' : 'ai_generated'
           },
           status: 'completed'
-        })
+      }
+      console.log('📋 Insert data:', insertData)
+      
+      const { data: dbData, error: dbError } = await supabase
+        .from('fashion_models')
+        .insert(insertData)
+        .select()
 
-      if (dbError) throw dbError
+      if (dbError) {
+        console.error('❌ Database error:', dbError)
+        throw new Error(`Database error: ${dbError.message}`)
+      }
+      
+      console.log('✅ Database insert success:', dbData)
 
       // Save to activity history
-      if (user?.id) {
+      console.log('📝 Saving to activity history...')
         await userHistory.saveActivity({
           userId: user.id,
           activityType: 'create_model',
@@ -260,12 +302,29 @@ const CreateModelNovo: React.FC<CreateModelNovoProps> = ({ mode = 'ai', onBack, 
               hasBeard
             }
           }
-        }).catch(err => console.error('Error saving activity history:', err))
-      }
+      }).catch(err => console.error('⚠️ Error saving activity history:', err))
 
-      if (onViewModels) onViewModels()
+      console.log('🎉 Model saved successfully!')
+      
+      // Clear form and navigate to models
+      setSuccess(false)
+      setGeneratedModel(null)
+      setModelName('')
+      
+      // Navigate to models view
+      if (onViewModels) {
+        console.log('🚀 Navigating to models view...')
+        onViewModels()
+      } else if (onNavigate) {
+        console.log('🚀 Navigating via onNavigate...')
+        onNavigate('view-models')
+      }
+      
     } catch (err: any) {
-      setError(err.message || 'Failed to save model')
+      console.error('❌ Error saving model:', err)
+      const errorMessage = err.message || 'Failed to save model'
+      setError(errorMessage)
+      alert(`❌ Error: ${errorMessage}\n\nCheck the browser console (F12) for more details.`)
     } finally {
       setLoading(false)
     }

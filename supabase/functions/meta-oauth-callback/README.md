@@ -18,3 +18,4 @@ This Supabase Edge Function handles the Meta OAuth callback and exchanges the au
 3. The function will be available at:
    `https://[your-project].supabase.co/functions/v1/meta-oauth-callback`
 
+
