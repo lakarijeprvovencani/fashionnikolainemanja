@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { generateFashionVideo } from '../lib/gemini'
-import { userHistory } from '../lib/supabase'
+import { userHistory, aiGeneratedContent } from '../lib/supabase'
 
 // Safe localStorage wrapper to handle quota exceeded errors
 const safeLocalStorage = {
@@ -28,9 +28,11 @@ interface GenerateVideoNovoProps {
 const GenerateVideoNovo: React.FC<GenerateVideoNovoProps> = ({ imageUrl, onBack, onNavigate }) => {
   const { user } = useAuth()
   const [videoPrompt, setVideoPrompt] = useState('')
+  const [videoDuration, setVideoDuration] = useState<'5' | '10'>('5')
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [generatedVideo, setGeneratedVideo] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [progressStatus, setProgressStatus] = useState('')
   
   // Check if coming from marketing (Instagram/Facebook ad) or dress model
   const previousView = safeLocalStorage.getItem('video_previousView')
@@ -72,12 +74,15 @@ const GenerateVideoNovo: React.FC<GenerateVideoNovoProps> = ({ imageUrl, onBack,
 
     setGeneratingVideo(true)
     setError('')
+    setProgressStatus('Starting...')
     
     try {
       const videoUrl = await generateFashionVideo({
         imageUrl: imageToUse,
-        prompt: videoPrompt || 'Fashion model posing elegantly, subtle movements, cinematic lighting',
-        userId: user.id
+        prompt: videoPrompt || 'Fashion model walking elegantly, subtle movement',
+        userId: user.id,
+        duration: videoDuration,
+        onProgress: (status) => setProgressStatus(status)
       })
       
       setGeneratedVideo(videoUrl)
@@ -93,13 +98,28 @@ const GenerateVideoNovo: React.FC<GenerateVideoNovoProps> = ({ imageUrl, onBack,
       }
       
       if (user?.id) {
+        // Save to AI Generated Content (Gallery) - this is the main storage
+        await aiGeneratedContent.saveContent({
+          userId: user.id,
+          contentType: 'generated_video',
+          title: `AI Video - ${videoDuration}s`,
+          videoUrl: videoUrl,
+          imageUrl: imageToUse,
+          prompt: videoPrompt || 'Fashion model walking elegantly',
+          generationSettings: {
+            duration: videoDuration,
+            source: isFromMarketing ? 'marketing' : 'dress_model'
+          }
+        }).catch(err => console.error('Error saving to gallery:', err))
+        
+        // Also save to activity history for tracking
         await userHistory.saveActivity({
           userId: user.id,
           activityType: 'generate_video',
           videoUrl: videoUrl,
           imageUrl: imageToUse,
-          prompt: videoPrompt || 'Fashion model posing elegantly, subtle movements, cinematic lighting',
-          metadata: {}
+          prompt: videoPrompt || 'Fashion model walking elegantly',
+          metadata: { duration: videoDuration }
         }).catch(err => console.error('Error saving activity history:', err))
       }
     } catch (err: any) {
@@ -209,6 +229,53 @@ const GenerateVideoNovo: React.FC<GenerateVideoNovoProps> = ({ imageUrl, onBack,
                 Video Animation
               </h2>
 
+              {/* Video Duration Selection */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  Video Duration
+                </label>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button
+                    onClick={() => setVideoDuration('5')}
+                    disabled={generatingVideo}
+                    style={{
+                      flex: 1,
+                      padding: '14px 16px',
+                      background: videoDuration === '5' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(0, 0, 0, 0.2)',
+                      border: videoDuration === '5' ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '12px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: generatingVideo ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    5 seconds
+                    <div style={{ fontSize: '11px', opacity: 0.7, marginTop: '4px' }}>5 tokens</div>
+                  </button>
+                  <button
+                    onClick={() => setVideoDuration('10')}
+                    disabled={generatingVideo}
+                    style={{
+                      flex: 1,
+                      padding: '14px 16px',
+                      background: videoDuration === '10' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(0, 0, 0, 0.2)',
+                      border: videoDuration === '10' ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '12px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: generatingVideo ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    10 seconds
+                    <div style={{ fontSize: '11px', opacity: 0.7, marginTop: '4px' }}>10 tokens</div>
+                  </button>
+                </div>
+              </div>
+
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
                   Describe the animation (optional)
@@ -220,7 +287,7 @@ const GenerateVideoNovo: React.FC<GenerateVideoNovoProps> = ({ imageUrl, onBack,
                   disabled={generatingVideo}
                   style={{
                     width: '100%',
-                    minHeight: '140px',
+                    minHeight: '120px',
                     padding: '16px',
                     border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: '8px',
@@ -243,7 +310,7 @@ const GenerateVideoNovo: React.FC<GenerateVideoNovoProps> = ({ imageUrl, onBack,
                   }}
                 />
                 <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginTop: '8px' }}>
-                  ⏱️ Video generation takes 1-3 minutes • 🎞️ 4-6 seconds duration
+                  ⏱️ Video generation takes 2-5 minutes
                 </p>
               </div>
 
@@ -368,10 +435,10 @@ const GenerateVideoNovo: React.FC<GenerateVideoNovoProps> = ({ imageUrl, onBack,
                   📹 Video Specs
                 </h3>
                 <ul style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.8', paddingLeft: '20px', margin: 0 }}>
-                  <li>Format: 9:16 (Story/Reel)</li>
-                  <li>Duration: 4-6 seconds</li>
-                  <li>Resolution: HD (720p-1080p)</li>
-                  <li>Powered by Google Veo</li>
+                  <li>Duration: 5 or 10 seconds</li>
+                  <li>Resolution: HD quality</li>
+                  <li>Perfect for Instagram Reels & Stories</li>
+                  <li>Powered by AI Fashion Video</li>
                 </ul>
               </div>
             </div>
@@ -397,16 +464,28 @@ const GenerateVideoNovo: React.FC<GenerateVideoNovoProps> = ({ imageUrl, onBack,
             {generatingVideo ? (
               <div style={{ textAlign: 'center', padding: '40px' }}>
                 <div style={{
-                  width: '50px',
-                  height: '50px',
+                  width: '60px',
+                  height: '60px',
                   border: '4px solid rgba(255,255,255,0.1)',
                   borderTopColor: '#667eea',
                   borderRadius: '50%',
                   margin: '0 auto 24px',
                   animation: 'spin 1s linear infinite'
                 }}></div>
-                <p style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Generating video...</p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>This may take 1-3 minutes</p>
+                <p style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>🎬 Creating your video...</p>
+                <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>{progressStatus}</p>
+                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Please keep this page open</p>
+                <div style={{
+                  marginTop: '24px',
+                  padding: '16px',
+                  background: 'rgba(102, 126, 234, 0.1)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(102, 126, 234, 0.2)'
+                }}>
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>
+                    💡 Tip: Video generation typically takes 2-5 minutes depending on duration
+                  </p>
+                </div>
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
               </div>
             ) : generatedVideo ? (

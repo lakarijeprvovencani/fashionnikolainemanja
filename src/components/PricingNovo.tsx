@@ -14,10 +14,14 @@ const PricingNovo: React.FC<PricingNovoProps> = ({ onBack, onSuccess, onNavigate
   const [plans, setPlans] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activating, setActivating] = useState<string | null>(null)
+  const [currentPlan, setCurrentPlan] = useState<string | null>(null)
 
   useEffect(() => {
     loadPlans()
-  }, [])
+    if (user) {
+      loadCurrentSubscription()
+    }
+  }, [user])
 
   const loadPlans = async () => {
     setLoading(true)
@@ -28,6 +32,19 @@ const PricingNovo: React.FC<PricingNovoProps> = ({ onBack, onSuccess, onNavigate
       console.error('Error loading plans:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadCurrentSubscription = async () => {
+    if (!user) return
+    try {
+      const { data } = await subscriptions.getUserSubscription(user.id)
+      if (data && data.status === 'active') {
+        setCurrentPlan(data.plan_type)
+        console.log('📋 Current plan:', data.plan_type)
+      }
+    } catch (error) {
+      console.error('Error loading subscription:', error)
     }
   }
 
@@ -228,18 +245,23 @@ const PricingNovo: React.FC<PricingNovoProps> = ({ onBack, onSuccess, onNavigate
         }}>
           {plans.map((plan) => {
             const isBestValue = plan.id === getBestValuePlan()
+            const isCurrentPlan = currentPlan === plan.id
             
             return (
               <div
                 key={plan.id}
                 style={{
-                  background: isBestValue 
-                    ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)' 
-                    : 'rgba(0, 0, 0, 0.4)',
+                  background: isCurrentPlan
+                    ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.2) 100%)'
+                    : isBestValue 
+                      ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)' 
+                      : 'rgba(0, 0, 0, 0.4)',
                   color: '#fff',
-                  border: isBestValue 
-                    ? '2px solid rgba(102, 126, 234, 0.5)' 
-                    : '1px solid rgba(255,255,255,0.1)',
+                  border: isCurrentPlan
+                    ? '2px solid rgba(34, 197, 94, 0.5)'
+                    : isBestValue 
+                      ? '2px solid rgba(102, 126, 234, 0.5)' 
+                      : '1px solid rgba(255,255,255,0.1)',
                   padding: '40px',
                   position: 'relative',
                   display: 'flex',
@@ -260,7 +282,24 @@ const PricingNovo: React.FC<PricingNovoProps> = ({ onBack, onSuccess, onNavigate
                   e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.3)'
                 }}
               >
-                {isBestValue && (
+                {isCurrentPlan && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '20px',
+                    right: '20px',
+                    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                    color: '#fff',
+                    padding: '6px 12px',
+                    fontSize: '10px',
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    borderRadius: '8px'
+                  }}>
+                    ✓ Active
+                  </div>
+                )}
+                {isBestValue && !isCurrentPlan && (
                   <div style={{
                     position: 'absolute',
                     top: '20px',
@@ -307,28 +346,34 @@ const PricingNovo: React.FC<PricingNovoProps> = ({ onBack, onSuccess, onNavigate
                 </div>
 
                 <button
-                  onClick={() => handleSubscribe(plan.id)}
-                  disabled={activating !== null}
+                  onClick={() => !isCurrentPlan && handleSubscribe(plan.id)}
+                  disabled={activating !== null || isCurrentPlan}
                   style={{
                     width: '100%',
                     padding: '16px',
-                    background: isBestValue 
-                      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
-                      : 'rgba(255,255,255,0.1)',
+                    background: isCurrentPlan
+                      ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+                      : isBestValue 
+                        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                        : 'rgba(255,255,255,0.1)',
                     color: '#fff',
-                    border: isBestValue ? 'none' : '1px solid rgba(255,255,255,0.2)',
+                    border: isCurrentPlan 
+                      ? 'none' 
+                      : isBestValue 
+                        ? 'none' 
+                        : '1px solid rgba(255,255,255,0.2)',
                     fontSize: '13px',
                     fontWeight: '600',
                     textTransform: 'uppercase',
                     letterSpacing: '1px',
-                    cursor: activating !== null ? 'not-allowed' : 'pointer',
+                    cursor: (activating !== null || isCurrentPlan) ? 'not-allowed' : 'pointer',
                     opacity: activating !== null ? 0.7 : 1,
                     transition: 'all 0.2s',
                     borderRadius: '12px',
                     backdropFilter: 'blur(10px)'
                   }}
                   onMouseEnter={(e) => {
-                    if (activating === null) {
+                    if (activating === null && !isCurrentPlan) {
                       e.currentTarget.style.transform = 'translateY(-2px)'
                       e.currentTarget.style.boxShadow = '0 8px 16px rgba(102, 126, 234, 0.4)'
                     }
@@ -338,7 +383,11 @@ const PricingNovo: React.FC<PricingNovoProps> = ({ onBack, onSuccess, onNavigate
                     e.currentTarget.style.boxShadow = 'none'
                   }}
                 >
-                  {activating === plan.id ? 'Processing...' : 'Subscribe'}
+                  {isCurrentPlan 
+                    ? '✓ Current Plan' 
+                    : activating === plan.id 
+                      ? 'Processing...' 
+                      : 'Subscribe'}
                 </button>
               </div>
             )

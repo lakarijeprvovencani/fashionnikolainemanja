@@ -161,6 +161,75 @@ const ViewModelsNovo: React.FC<ViewModelsNovoProps> = ({ onBack, onSelectModel, 
           </button>
         </div>
 
+        {/* Explanation Banner - Only show when there are models */}
+        {models.length > 0 ? (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%)',
+            borderRadius: '16px',
+            padding: '16px 20px',
+            marginBottom: '24px',
+            border: '1px solid rgba(102, 126, 234, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '20px',
+              flexShrink: 0,
+              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+            }}>👗</div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '4px', color: '#fff' }}>
+                Select a model to dress it
+              </div>
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>
+                Click on any model below to open the virtual dressing room
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%)',
+            borderRadius: '16px',
+            padding: '20px 24px',
+            marginBottom: '24px',
+            border: '1px solid rgba(251, 191, 36, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '14px',
+              background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '24px',
+              flexShrink: 0,
+              boxShadow: '0 4px 12px rgba(251, 191, 36, 0.3)'
+            }}>✨</div>
+            <div>
+              <div style={{ fontSize: '15px', fontWeight: '600', marginBottom: '6px', color: '#fff' }}>
+                Create your first AI model
+              </div>
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5' }}>
+                Click "New Model" or the card below to create an AI fashion model. Once created, you can dress it with your clothing items.
+              </div>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '100px' }}>
             <div className="spinner" style={{ borderTopColor: '#fff', borderLeftColor: '#fff' }}></div>

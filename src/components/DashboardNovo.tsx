@@ -24,6 +24,7 @@ import ViewModelsNovo from './ViewModelsNovo'
 import GenerateVideoView from './GenerateVideoView'
 import GenerateVideoNovo from './GenerateVideoNovo'
 import CaptionGeneratorNovo from './CaptionGeneratorNovo'
+import OnboardingWizard from './OnboardingWizard'
 import CreateCaptionsView from './CreateCaptionsView'
 import CreateCaptionsNovo from './CreateCaptionsNovo'
 import EditImageView from './EditImageView'
@@ -67,6 +68,15 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
   const [recentModels, setRecentModels] = useState<any[]>([])
   const [showModelsWelcome, setShowModelsWelcome] = useState(true)
   const [showAccountDropdown, setShowAccountDropdown] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
+  // Check if onboarding should be shown (only for new users)
+  useEffect(() => {
+    const onboardingCompleted = localStorage.getItem('onboarding_completed')
+    if (!onboardingCompleted && user) {
+      setShowOnboarding(true)
+    }
+  }, [user])
 
   // Scroll to top when changing views
   useEffect(() => {
@@ -339,6 +349,8 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
           setInternalView('subscription')
         } else if (view === 'pricing') {
           setInternalView('pricing')
+        } else if (view === 'meta-connect') {
+          setInternalView('meta-connect')
         } else {
           onNavigate(view)
         }
@@ -491,6 +503,17 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
       position: 'relative',
       overflow: 'hidden'
     }}>
+      {/* Onboarding Wizard */}
+      {showOnboarding && (
+        <OnboardingWizard
+          onComplete={() => setShowOnboarding(false)}
+          onNavigate={(view) => {
+            setShowOnboarding(false)
+            setInternalView(view)
+          }}
+        />
+      )}
+
       <style>{`
         .dashboard-container {
           position: relative;
@@ -964,7 +987,7 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
                     position: 'relative',
                     zIndex: 1,
                     textShadow: '0 2px 12px rgba(0, 0, 0, 0.4)'
-                  }}>Explore or Create Models</h2>
+                  }}>Create & Dress Models</h2>
                   
                   <p style={{
                     fontSize: '14px',
@@ -974,7 +997,7 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
                     position: 'relative',
                     zIndex: 1,
                     maxWidth: '300px'
-                  }}>Click to browse your AI models or create a new one</p>
+                  }}>Create AI models and dress them with your clothing items</p>
                 </div>
               </div>
             ) : (
@@ -1048,6 +1071,17 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
                   fontSize: '20px'
                 }}>+</div>
                 <div style={{ fontSize: '14px', fontWeight: '600', textAlign: 'center' }}>Create Model</div>
+                {recentModels.length === 0 && (
+                  <div style={{ 
+                    fontSize: '10px', 
+                    color: 'rgba(255,255,255,0.4)', 
+                    textAlign: 'center',
+                    marginTop: '8px',
+                    padding: '0 8px'
+                  }}>
+                    Create a model first to dress it
+                  </div>
+                )}
               </div>
 
               {/* Existing Models */}
@@ -1092,6 +1126,27 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
               ))}
             </div>
             
+            {/* Hint text - only show when there are models */}
+            {recentModels.length > 0 && (
+              <div style={{
+                textAlign: 'center',
+                padding: '8px 12px',
+                marginBottom: '8px'
+              }}>
+                <span style={{ 
+                  fontSize: '12px', 
+                  color: 'rgba(255,255,255,0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}>
+                  <span style={{ fontSize: '14px' }}>👆</span>
+                  Click on a model to dress it with your clothes
+                </span>
+              </div>
+            )}
+            
             {/* Manage Models Button */}
             <div style={{
               display: 'flex',
@@ -1111,98 +1166,7 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
 
           {/* Grid of smaller cards - 3 cards */}
           <div className="side-cards-wrapper side-cards-grid-3">
-            {/* Card 1 - Gallery */}
-            <div className="side-card" style={{
-              background: 'rgba(0, 0, 0, 0.4)',
-              borderRadius: '24px',
-              padding: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(20px)',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-            onClick={() => setInternalView('history-gallery')}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)'
-              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
-              e.currentTarget.style.transform = 'translateY(-2px)'
-              e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.4)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'
-              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = 'none'
-            }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                <div style={{ 
-                  width: '28px', 
-                  height: '28px', 
-                  borderRadius: '50%', 
-                  background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '14px'
-                }}>📸</div>
-                <div style={{ fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Gallery</div>
-              </div>
-              <div className="side-card-image" style={{
-                width: '100%',
-                height: '100px',
-                borderRadius: '16px',
-                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                backdropFilter: 'blur(30px)',
-                WebkitBackdropFilter: 'blur(30px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative',
-                overflow: 'hidden',
-                transition: 'all 0.15s ease',
-                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(102, 126, 234, 0.3)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.35) 0%, rgba(118, 75, 162, 0.35) 100%)'
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
-                e.currentTarget.style.boxShadow = 'inset 0 1px 0 0 rgba(255, 255, 255, 0.3), 0 6px 20px rgba(102, 126, 234, 0.5)'
-                e.currentTarget.style.transform = 'scale(1.02)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%)'
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
-                e.currentTarget.style.boxShadow = 'inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(102, 126, 234, 0.3)'
-                e.currentTarget.style.transform = 'scale(1)'
-              }}
-              >
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)',
-                  opacity: 0.8,
-                  borderRadius: '16px',
-                  transition: 'opacity 0.15s ease'
-                }}></div>
-                <span style={{ fontSize: '16px', fontWeight: '600', color: '#fff', letterSpacing: '0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)' }}>Gallery</span>
-              </div>
-              <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>Browse and manage all your AI-generated content</span>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setInternalView('history-gallery')
-                  }}
-                  style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '12px', padding: '4px 10px', color: 'white', fontSize: '10px', cursor: 'pointer' }}
-                >View</button>
-              </div>
-            </div>
-
-            {/* Card 2 - Marketing */}
+            {/* Card 1 - Marketing */}
             <div className="side-card" style={{
               background: 'rgba(0, 0, 0, 0.4)',
               borderRadius: '24px',
@@ -1293,7 +1257,7 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
               </div>
             </div>
 
-            {/* Card 3 - Brand Memory Map */}
+            {/* Card 2 - Brand Memory Map */}
             <div className="side-card" style={{
               background: 'rgba(0, 0, 0, 0.4)',
               borderRadius: '24px',
@@ -1381,6 +1345,97 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
                   }}
                   style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '12px', padding: '4px 10px', color: 'white', fontSize: '10px', cursor: 'pointer' }}
                 >Manage</button>
+              </div>
+            </div>
+
+            {/* Card 3 - Gallery */}
+            <div className="side-card" style={{
+              background: 'rgba(0, 0, 0, 0.4)',
+              borderRadius: '24px',
+              padding: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(20px)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            onClick={() => setInternalView('history-gallery')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.4)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                <div style={{ 
+                  width: '28px', 
+                  height: '28px', 
+                  borderRadius: '50%', 
+                  background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px'
+                }}>📸</div>
+                <div style={{ fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Gallery</div>
+              </div>
+              <div className="side-card-image" style={{
+                width: '100%',
+                height: '100px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(240, 147, 251, 0.25) 0%, rgba(245, 87, 108, 0.25) 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(30px)',
+                WebkitBackdropFilter: 'blur(30px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                overflow: 'hidden',
+                transition: 'all 0.15s ease',
+                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(240, 147, 251, 0.3)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(240, 147, 251, 0.35) 0%, rgba(245, 87, 108, 0.35) 100%)'
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                e.currentTarget.style.boxShadow = 'inset 0 1px 0 0 rgba(255, 255, 255, 0.3), 0 6px 20px rgba(240, 147, 251, 0.5)'
+                e.currentTarget.style.transform = 'scale(1.02)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(240, 147, 251, 0.25) 0%, rgba(245, 87, 108, 0.25) 100%)'
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                e.currentTarget.style.boxShadow = 'inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(240, 147, 251, 0.3)'
+                e.currentTarget.style.transform = 'scale(1)'
+              }}
+              >
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(135deg, rgba(240, 147, 251, 0.15) 0%, rgba(245, 87, 108, 0.15) 100%)',
+                  opacity: 0.8,
+                  borderRadius: '16px',
+                  transition: 'opacity 0.15s ease'
+                }}></div>
+                <span style={{ fontSize: '16px', fontWeight: '600', color: '#fff', letterSpacing: '0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)' }}>Gallery</span>
+              </div>
+              <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>Browse and manage all your AI-generated content</span>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setInternalView('history-gallery')
+                  }}
+                  style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '12px', padding: '4px 10px', color: 'white', fontSize: '10px', cursor: 'pointer' }}
+                >View</button>
               </div>
             </div>
           </div>

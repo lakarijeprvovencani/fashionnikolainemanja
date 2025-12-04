@@ -196,7 +196,7 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
   const getContentTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       'dressed_model': 'Dressed Model',
-      'instagram_ad': 'Instagram Ad',
+      'instagram_ad': 'Social Media Ad',
       'generated_video': 'Video'
     }
     return labels[type] || type
@@ -204,7 +204,7 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
 
   const getContentTypeIcon = (type: string) => {
     if (type === 'dressed_model') return '👤'
-    if (type === 'instagram_ad') return '📷'
+    if (type === 'instagram_ad') return '📱'
     if (type === 'generated_video') return '🎥'
     return '📄'
   }
@@ -415,7 +415,7 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
               {filterType === 'all' ? 'All Content' : 
                filterType === 'favorites' ? '⭐ Favorites' :
                filterType === 'dressed_model' ? 'Dressed Model' :
-               filterType === 'instagram_ad' ? 'Instagram Ad' :
+               filterType === 'instagram_ad' ? 'Social Media Ad' :
                filterType === 'video' ? 'Video' :
                filterType.replace('_', ' ')}
             </button>
@@ -490,7 +490,96 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
                 }}
                 onClick={() => setSelectedContent(item)}
               >
-                {item.image_url && (
+                {/* Video content */}
+                {item.content_type === 'generated_video' && item.video_url ? (
+                  <div style={{
+                    width: '100%',
+                    height: '200px',
+                    background: 'rgba(0,0,0,0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }}
+                  className="image-container-responsive"
+                  >
+                    <video
+                      src={item.video_url}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                      muted
+                      playsInline
+                      onMouseEnter={(e) => e.currentTarget.play()}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.pause()
+                        e.currentTarget.currentTime = 0
+                      }}
+                    />
+                    {/* Video play icon overlay */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: '50px',
+                      height: '50px',
+                      background: 'rgba(102, 126, 234, 0.9)',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      pointerEvents: 'none'
+                    }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                      </svg>
+                    </div>
+                    {/* Heart icon for video */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (!item.id) return
+                        toggleFavorite(item.id, item.is_favorite || false)
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        background: item.is_favorite 
+                          ? 'rgba(239, 68, 68, 0.9)' 
+                          : 'rgba(0, 0, 0, 0.6)',
+                        borderRadius: '50%',
+                        width: '36px',
+                        height: '36px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 2,
+                        backdropFilter: 'blur(10px)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                      }}
+                    >
+                      <svg 
+                        width="20" 
+                        height="20" 
+                        viewBox="0 0 24 24" 
+                        fill={item.is_favorite ? "currentColor" : "none"} 
+                        stroke="currentColor" 
+                        strokeWidth="2"
+                        style={{ color: '#fff' }}
+                      >
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                      </svg>
+                    </button>
+                  </div>
+                ) : item.image_url ? (
                   <div style={{
                     width: '100%',
                     height: '200px',
@@ -570,7 +659,7 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
                       </svg>
                     </button>
                   </div>
-                )}
+                ) : null}
 
                 <div style={{ padding: '20px' }}>
                   <div style={{
@@ -663,10 +752,13 @@ const HistoryGalleryNovo: React.FC<HistoryGalleryNovoProps> = ({ onBack, onNavig
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          if (!item.image_url) return
+                          // Handle both video and image downloads
+                          const downloadUrl = item.content_type === 'generated_video' ? item.video_url : item.image_url
+                          if (!downloadUrl) return
                           const link = document.createElement('a')
-                          link.href = item.image_url
-                          link.download = `${item.content_type}-${item.id || Date.now()}.png`
+                          link.href = downloadUrl
+                          const extension = item.content_type === 'generated_video' ? 'mp4' : 'png'
+                          link.download = `${item.content_type}-${item.id || Date.now()}.${extension}`
                           document.body.appendChild(link)
                           link.click()
                           document.body.removeChild(link)

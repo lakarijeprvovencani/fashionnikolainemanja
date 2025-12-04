@@ -747,7 +747,7 @@ Generate a professional, eye-catching ad image.`
         const saveResult = await aiGeneratedContent.saveContent({
           userId: user.id,
           contentType: 'instagram_ad',
-          title: 'Instagram Ad',
+          title: 'Social Media Ad',
           imageUrl: finalImageUrl,
           prompt: prompt,
           generationSettings: {
@@ -1142,71 +1142,6 @@ Generate a professional, eye-catching ad image.`
                 </div>
               </div>
 
-              {/* Analytics */}
-              <div
-                onClick={() => onNavigate('analytics')}
-                style={{
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  borderRadius: '24px',
-                  padding: '28px',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  backdropFilter: 'blur(20px)',
-                  WebkitBackdropFilter: 'blur(20px)',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
-                  e.currentTarget.style.transform = 'translateY(-4px)'
-                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'
-                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(102, 126, 234, 0.2)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ 
-                    width: '56px', 
-                    height: '56px', 
-                    borderRadius: '16px', 
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    boxShadow: '0 4px 16px rgba(102, 126, 234, 0.3)'
-                  }}>
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                      <path d="M3 3v18h18"></path>
-                      <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
-                    </svg>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '4px' }}>Analytics</h3>
-                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0 }}>Track performance & insights</p>
-                  </div>
-                </div>
-                <div style={{ 
-                  padding: '12px', 
-                  background: 'rgba(102, 126, 234, 0.1)', 
-                  borderRadius: '12px', 
-                  border: '1px solid rgba(102, 126, 234, 0.2)',
-                  fontSize: '11px',
-                  color: 'rgba(255,255,255,0.7)',
-                  lineHeight: '1.5'
-                }}>
-                  Monitor your ad campaigns and get detailed insights into engagement, reach, and conversions
-                </div>
-              </div>
             </div>
           </div>
 
@@ -1467,8 +1402,14 @@ Generate a professional, eye-catching ad image.`
             <button 
               onClick={() => {
                 if (selectedAdType) {
-                  // Going back to platform selection - clear saved ad type
+                  // Going back to platform selection - clear saved ad type and all localStorage for this ad type
+                  const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
                   safeLocalStorage.removeItem('marketing_selectedAdType')
+                  safeLocalStorage.removeItem(`${prefix}_uploadedImage`)
+                  safeLocalStorage.removeItem(`${prefix}_generated`)
+                  safeLocalStorage.removeItem(`${prefix}_prompt`)
+                  safeLocalStorage.removeItem(`${prefix}_selectedTemplate`)
+                  safeLocalStorage.removeItem(`${prefix}_selectedAspectRatio`)
                   setSelectedAdType(null)
                   setAspectRatio('4:5')
                   setUploadedImage(null)
@@ -1589,6 +1530,11 @@ Generate a professional, eye-catching ad image.`
                     onClick={() => {
                       setUploadedImage(null)
                       setImageFile(null)
+                      // Also clear from localStorage so it doesn't reappear on navigation
+                      if (selectedAdType) {
+                        const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+                        safeLocalStorage.removeItem(`${prefix}_uploadedImage`)
+                      }
                     }}
                     style={{
                       position: 'absolute',

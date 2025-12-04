@@ -136,8 +136,9 @@ const SubscriptionNovo: React.FC<SubscriptionNovoProps> = ({ onBack, onNavigate,
     }
     if (num >= 1000) {
       const thousands = num / 1000
-      if (thousands % 1 > 0.99 || thousands % 1 < 0.01) {
-        return `${thousands.toFixed(3)}K`
+      // If it's a whole number (like 100K), don't show decimals
+      if (Number.isInteger(thousands)) {
+        return `${thousands}K`
       }
       return `${thousands.toFixed(1)}K`
     }

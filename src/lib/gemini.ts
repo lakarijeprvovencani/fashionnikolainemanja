@@ -1034,99 +1034,161 @@ interface GenerateVideoOptions {
   imageUrl: string
   prompt?: string
   userId: string
+  duration?: '5' | '10'
+  onProgress?: (status: string) => void
+}
+
+// NewBlack AI credentials from environment
+const NEWBLACK_EMAIL = import.meta.env.VITE_NEWBLACK_EMAIL || ''
+const NEWBLACK_PASSWORD = import.meta.env.VITE_NEWBLACK_PASSWORD || ''
+
+// Helper function to convert base64/dataURL to public URL via Supabase storage
+const getPublicImageUrl = async (imageUrl: string, userId: string): Promise<string> => {
+  // If already a public URL (https://), return as is
+  if (imageUrl.startsWith('https://') && !imageUrl.startsWith('data:')) {
+    return imageUrl
+  }
+  
+  // It's a base64/dataURL - need to upload to Supabase storage
+  console.log('📤 Uploading image to get public URL...')
+  
+  // Convert data URL to blob
+  const response = await fetch(imageUrl)
+  const blob = await response.blob()
+  
+  // Generate unique filename
+  const timestamp = Date.now()
+  const filename = `video-source-${timestamp}.png`
+  const path = `${userId}/${filename}`
+  
+  // Upload to Supabase storage (use generated-ads bucket which exists)
+  const { storage } = await import('./supabase')
+  const { url, error } = await storage.uploadImage('generated-ads', path, blob)
+  
+  if (error || !url) {
+    console.error('❌ Failed to upload image:', error)
+    throw new Error('Failed to upload image for video generation')
+  }
+  
+  console.log('✅ Image uploaded, public URL:', url)
+  return url
 }
 
 export const generateFashionVideo = async (options: GenerateVideoOptions): Promise<string> => {
+  const { imageUrl, prompt, userId, duration = '5', onProgress } = options
+  
   try {
-    const { imageUrl, prompt, userId } = options
+    // Check if NewBlack credentials are set
+    if (!NEWBLACK_EMAIL || !NEWBLACK_PASSWORD) {
+      throw new Error('Video API credentials not configured. Please contact support.')
+    }
     
-    // Check tokens - Video is expensive, let's say 5 tokens
-    const VIDEO_COST = 5
+    // Check tokens - Video costs 5 tokens for 5s, 10 for 10s
+    const VIDEO_COST = duration === '10' ? 10 : 5
     const { hasTokens } = await tokens.hasEnoughTokens(userId, VIDEO_COST)
     if (!hasTokens) {
       throw new Error(`Insufficient tokens for video generation. Requires ${VIDEO_COST} tokens.`)
     }
 
-    console.log('🎬 Starting video generation...')
+    console.log('🎬 Starting NewBlack AI video generation...')
+    console.log('📧 Using email:', NEWBLACK_EMAIL)
+    onProgress?.('Preparing image...')
     
-    // Fetch image
-    const response = await fetch(imageUrl)
-    const blob = await response.blob()
+    // Step 1: Get public URL for the image
+    const publicImageUrl = await getPublicImageUrl(imageUrl, userId)
     
-    // Gemini Video Generation (using Veo)
-    // Note: The SDK method signatures might vary, adjusting for typical Veo usage
-    // Since direct image-to-video might need specific endpoint, we'll use generateVideos if available or fallback logic
+    // Step 2: Call NewBlack API to start video generation
+    onProgress?.('Starting video generation...')
+    console.log('📡 Calling NewBlack AI API...')
     
-    // Convert to base64 for the API
-    const base64Image = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result as string)
-        reader.onerror = reject
-        reader.readAsDataURL(blob)
+    const videoPrompt = prompt || 'Fashion model walking elegantly, subtle movement, professional fashion photoshoot'
+    
+    const formData = new FormData()
+    formData.append('email', NEWBLACK_EMAIL)
+    formData.append('password', NEWBLACK_PASSWORD)
+    formData.append('time', duration)
+    formData.append('image', publicImageUrl)
+    formData.append('prompt', videoPrompt)
+    
+    const startResponse = await fetch('https://thenewblack.ai/api/1.1/wf/ai-video', {
+      method: 'POST',
+      body: formData
     })
-    const base64Data = base64Image.split(',')[1]
-
-    const videoPrompt = prompt || "Fashion model posing, subtle movement, professional lighting, 4k resolution, cinematic slow motion"
     
-    // Using the correct method for video generation if available in this SDK version
-    // If ai.models.generateVideos is not available, we might need to use a different approach
-    // Assuming google-genai SDK has generateVideos or similar for Veo
+    if (!startResponse.ok) {
+      const errorText = await startResponse.text()
+      console.error('❌ NewBlack API error:', errorText)
+      throw new Error('Failed to start video generation. Please try again.')
+    }
     
-    try {
-        // @ts-ignore - Ignoring TS error if method name differs in installed version
-        const videoOp = await ai.models.generateVideos({
-            model: 'veo-2.0-generate-001', // or veo-3.0-fast-generate-preview
-            prompt: videoPrompt,
-            image: {
-                imageBytes: base64Data,
-                mimeType: blob.type
-            },
-            config: {
-                numberOfVideos: 1,
-                aspectRatio: '9:16' // Matching typical fashion content
-            }
+    const videoId = await startResponse.text()
+    console.log('✅ Video generation started, ID:', videoId)
+    
+    if (!videoId || videoId.length < 10) {
+      throw new Error('Invalid response from video API')
+    }
+    
+    // Step 3: Poll for video completion (2-5 minutes typically)
+    onProgress?.('Generating video (this takes 2-5 minutes)...')
+    
+    const maxAttempts = 20 // 20 attempts * 20 seconds = ~7 minutes max
+    let attempts = 0
+    let videoUrl: string | null = null
+    
+    while (attempts < maxAttempts) {
+      attempts++
+      
+      // Wait 20 seconds between polls (first wait is 30s since generation takes time)
+      const waitTime = attempts === 1 ? 30000 : 20000
+      console.log(`⏳ Waiting ${waitTime/1000}s before checking... (attempt ${attempts}/${maxAttempts})`)
+      onProgress?.(`Generating video... (${Math.round(attempts * 20 / 60)} min elapsed)`)
+      await new Promise(r => setTimeout(r, waitTime))
+      
+      // Poll for result
+      const resultFormData = new FormData()
+      resultFormData.append('email', NEWBLACK_EMAIL)
+      resultFormData.append('password', NEWBLACK_PASSWORD)
+      resultFormData.append('id', videoId.trim())
+      
+      try {
+        const resultResponse = await fetch('https://thenewblack.ai/api/1.1/wf/results_video', {
+          method: 'POST',
+          body: resultFormData
         })
         
-        console.log('Video operation started:', videoOp)
-        
-        // Polling for completion
-        let operation = videoOp
-        let attempts = 0
-        const maxAttempts = 60 // 5 minutes roughly
-        
-        while (!operation.done && attempts < maxAttempts) {
-            attempts++
-            await new Promise(r => setTimeout(r, 5000))
-            // @ts-ignore
-            operation = await ai.operations.getVideosOperation({ operation: operation })
-            console.log('Video generation status:', operation.state)
+        if (resultResponse.ok) {
+          const result = await resultResponse.text()
+          
+          // Check if we got a valid video URL
+          if (result && result.includes('http') && (result.includes('.mp4') || result.includes('cdn'))) {
+            videoUrl = result.trim()
+            console.log('✅ Video ready:', videoUrl)
+            break
+          }
+          
+          console.log('⏳ Video not ready yet, response:', result.substring(0, 100))
         }
-        
-        if (operation.done && operation.result?.videos?.[0]?.uri) {
-            const videoUri = operation.result.videos[0].uri
-            
-            // Deduct tokens
-            const { success } = await tokens.deductTokens(userId, VIDEO_COST, 'Generated fashion video')
-            if (success) {
-              notifyTokenUpdate() // Notify UI to refresh token display
-            }
-            
-            // The URI might be temporary, usually we'd download it here. 
-            // For now returning the URI or if it requires auth, we might need to proxy or fetch it.
-            // Often these URIs are signed google storage links.
-            return videoUri
-        }
-        
-        throw new Error('Video generation failed or timed out')
-        
-    } catch (veoError) {
-        console.error('Veo generation error:', veoError)
-        // Fallback or detailed error
-        throw veoError
+      } catch (pollError) {
+        console.log('⚠️ Poll error (will retry):', pollError)
+      }
     }
+    
+    if (!videoUrl) {
+      throw new Error('Video generation timed out. Please try again.')
+    }
+    
+    // Step 4: Deduct tokens
+    onProgress?.('Finalizing...')
+    const { success } = await tokens.deductTokens(userId, VIDEO_COST, `Generated ${duration}s fashion video`)
+    if (success) {
+      notifyTokenUpdate()
+    }
+    
+    console.log('🎉 Video generation complete!')
+    return videoUrl
 
   } catch (error: any) {
-    console.error('Error generating video:', error)
+    console.error('❌ Error generating video:', error)
     throw new Error(error.message || 'Failed to generate video.')
   }
 }
