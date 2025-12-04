@@ -50,12 +50,14 @@ const clearUserLocalStorage = () => {
     'instagram_ad_uploadedImage',
     'instagram_ad_selectedTemplate',
     'instagram_ad_selectedAspectRatio',
+    'instagram_ad_caption',
     'facebook_ad_editImage',
     'facebook_ad_generated',
     'facebook_ad_prompt',
     'facebook_ad_uploadedImage',
     'facebook_ad_selectedTemplate',
     'facebook_ad_selectedAspectRatio',
+    'facebook_ad_caption',
     // Analytics
     'analytics_data_mock',
     // Selected ad type

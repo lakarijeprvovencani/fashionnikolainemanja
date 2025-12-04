@@ -121,13 +121,28 @@ const MarketingNovo: React.FC<MarketingNovoProps> = ({ adType, onBack, onNavigat
   
   // Tab and captions state
   const [activeTab, setActiveTab] = useState<'create' | 'preview'>('create')
-  const [generatedCaption, setGeneratedCaption] = useState<string>('')
+  const [generatedCaption, setGeneratedCaption] = useState<string>(() => {
+    // Load caption from localStorage on mount
+    if (adType) {
+      const prefix = adType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+      return safeLocalStorage.getItem(`${prefix}_caption`) || ''
+    }
+    return ''
+  })
   const [generatingCaption, setGeneratingCaption] = useState(false)
+  
+  // Progressive form state - tracks which steps are completed
+  const [templateStepCompleted, setTemplateStepCompleted] = useState(false)
   const [metaConnections, setMetaConnections] = useState<any[]>([])
   const [scheduleDate, setScheduleDate] = useState<string>('')
   const [scheduleTime, setScheduleTime] = useState<string>('12:00')
   const [scheduleConnectionId, setScheduleConnectionId] = useState<string>('')
   const [scheduling, setScheduling] = useState(false)
+  
+  // Gallery picker state
+  const [showGalleryPicker, setShowGalleryPicker] = useState(false)
+  const [galleryItems, setGalleryItems] = useState<any[]>([])
+  const [loadingGallery, setLoadingGallery] = useState(false)
   
   // Template picker state
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
@@ -278,6 +293,31 @@ const MarketingNovo: React.FC<MarketingNovoProps> = ({ adType, onBack, onNavigat
       console.error('Error processing image:', error)
       setError('An error occurred while processing the image.')
     }
+  }
+
+  // Load gallery items (dressed models, generated images, ads)
+  const loadGalleryItems = async () => {
+    if (!user) return
+    setLoadingGallery(true)
+    try {
+      const { data, error } = await aiGeneratedContent.getUserContent(user.id, {
+        limit: 50
+      })
+      if (!error && data) {
+        // Filter to only show items with images
+        const itemsWithImages = data.filter((item: any) => item.image_url)
+        setGalleryItems(itemsWithImages)
+      }
+    } catch (err) {
+      console.error('Error loading gallery:', err)
+    }
+    setLoadingGallery(false)
+  }
+
+  // Select image from gallery
+  const selectFromGallery = (item: any) => {
+    setUploadedImage(item.image_url)
+    setShowGalleryPicker(false)
   }
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -803,7 +843,13 @@ Generate a professional, eye-catching ad image.`
         }
       })
       console.log('✅ Caption generated successfully')
-      setGeneratedCaption(captions.instagram || '')
+      const newCaption = captions.instagram || ''
+      setGeneratedCaption(newCaption)
+      // Save caption to localStorage
+      if (selectedAdType && newCaption) {
+        const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+        safeLocalStorage.setItem(`${prefix}_caption`, newCaption)
+      }
       setActiveTab('preview')
     } catch (captionErr) {
       console.error('⚠️ Caption generation failed:', captionErr)
@@ -832,7 +878,13 @@ Generate a professional, eye-catching ad image.`
         }
       })
       console.log('✅ Caption regenerated successfully')
-      setGeneratedCaption(captions.instagram || '')
+      const newCaption = captions.instagram || ''
+      setGeneratedCaption(newCaption)
+      // Save caption to localStorage
+      if (selectedAdType && newCaption) {
+        const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+        safeLocalStorage.setItem(`${prefix}_caption`, newCaption)
+      }
     } catch (captionErr) {
       console.error('⚠️ Caption regeneration failed:', captionErr)
       alert('Failed to regenerate caption. Please try again.')
@@ -1402,24 +1454,12 @@ Generate a professional, eye-catching ad image.`
             <button 
               onClick={() => {
                 if (selectedAdType) {
-                  // Going back to platform selection - clear saved ad type and all localStorage for this ad type
-                  const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+                  // Going back to platform selection - just change the view, keep form data
                   safeLocalStorage.removeItem('marketing_selectedAdType')
-                  safeLocalStorage.removeItem(`${prefix}_uploadedImage`)
-                  safeLocalStorage.removeItem(`${prefix}_generated`)
-                  safeLocalStorage.removeItem(`${prefix}_prompt`)
-                  safeLocalStorage.removeItem(`${prefix}_selectedTemplate`)
-                  safeLocalStorage.removeItem(`${prefix}_selectedAspectRatio`)
                   setSelectedAdType(null)
-                  setAspectRatio('4:5')
-                  setUploadedImage(null)
-                  setImageFile(null)
-                  setPrompt('')
-                  setGeneratedAd(null)
-                  setGeneratedCaption('')
                   setActiveTab('create')
                 } else {
-                  // Going back to dashboard - clear saved ad type
+                  // Going back to dashboard
                   safeLocalStorage.removeItem('marketing_selectedAdType')
                   onBack()
                 }
@@ -1498,7 +1538,7 @@ Generate a professional, eye-catching ad image.`
             {/* LEFT SIDE: CONTROLS */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
-            {/* 1. Upload Image */}
+            {/* 1. Select Image - Compact design like Dress Studio */}
             <div style={{
               background: 'rgba(0, 0, 0, 0.4)',
               borderRadius: '24px',
@@ -1508,99 +1548,105 @@ Generate a professional, eye-catching ad image.`
               WebkitBackdropFilter: 'blur(20px)',
               boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
             }}>
-              <h3 style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', margin: '0 0 12px 0' }}>1. Upload Image</h3>
-              
               {uploadedImage ? (
-                <div style={{ position: 'relative', marginBottom: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                // Compact view when image is selected (like Milan card)
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <img 
                     src={uploadedImage} 
-                    alt="Uploaded" 
+                    alt="Selected" 
                     style={{ 
-                      maxWidth: '100%',
-                      maxHeight: '200px',
-                      width: 'auto',
-                      height: 'auto',
+                      width: '60px',
+                      height: '60px',
                       borderRadius: '12px', 
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      objectFit: 'contain'
+                      objectFit: 'cover',
+                      border: '1px solid rgba(255,255,255,0.1)'
                     }} 
                   />
-                  <button 
-                    onClick={() => {
-                      setUploadedImage(null)
-                      setImageFile(null)
-                      // Also clear from localStorage so it doesn't reappear on navigation
-                      if (selectedAdType) {
-                        const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
-                        safeLocalStorage.removeItem(`${prefix}_uploadedImage`)
-                      }
-                    }}
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: '600', color: 'white', margin: '0 0 4px 0' }}>Image Selected</h3>
+                    <button 
+                      onClick={() => {
+                        setUploadedImage(null)
+                        setImageFile(null)
+                        setTemplateStepCompleted(false)
+                        setSelectedTemplate(null)
+                        setPrompt('')
+                        if (selectedAdType) {
+                          const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+                          safeLocalStorage.removeItem(`${prefix}_uploadedImage`)
+                        }
+                      }}
+                      style={{ 
+                        background: 'transparent', 
+                        border: 'none', 
+                        color: 'rgba(255,255,255,0.5)', 
+                        fontSize: '12px', 
+                        cursor: 'pointer', 
+                        padding: 0,
+                        textDecoration: 'underline' 
+                      }}
+                    >
+                      Change Image
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Upload options when no image - compact row layout
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  {/* Upload button */}
+                  <button
+                    onClick={() => document.getElementById('ad-image-upload-novo')?.click()}
                     style={{
-                      position: 'absolute',
-                      top: '8px',
-                      right: '8px',
-                      background: 'rgba(0,0,0,0.7)',
-                      backdropFilter: 'blur(10px)',
-                      color: '#fff',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      borderRadius: '50%',
-                      width: '32px',
-                      height: '32px',
-                      fontSize: '18px',
-                      fontWeight: '600',
+                      width: '60px',
+                      height: '60px',
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      border: '2px dashed rgba(255,255,255,0.2)',
+                      borderRadius: '12px',
+                      color: 'rgba(255,255,255,0.5)',
                       cursor: 'pointer',
+                      transition: 'all 0.2s',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      transition: 'all 0.2s'
+                      flexShrink: 0
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(220, 38, 38, 0.8)'
+                      e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
+                      e.currentTarget.style.color = '#667eea'
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(0,0,0,0.7)'
-                    }}
-                  >×</button>
-                </div>
-              ) : (
-                <div
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={(e) => {
-                    if (!isDragging) {
-                      const input = document.getElementById('ad-image-upload-novo') as HTMLInputElement
-                      input?.click()
-                    }
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    aspectRatio: '1',
-                    border: `2px dashed ${isDragging ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)'}`,
-                    borderRadius: '16px',
-                    background: isDragging ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.2)',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    minHeight: '150px',
-                    transform: isDragging ? 'scale(1.02)' : 'scale(1)',
-                    backdropFilter: 'blur(10px)'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isDragging) {
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'
-                      e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isDragging) {
                       e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'
-                      e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)'
-                    }
-                  }}
-                >
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
+                    }}
+                  >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="12" y1="5" x2="12" y2="19"/>
+                      <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                  </button>
+                  
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: '600', color: 'white', margin: '0 0 4px 0' }}>Upload Image</h3>
+                    <button 
+                      onClick={() => {
+                        setShowGalleryPicker(true)
+                        loadGalleryItems()
+                      }}
+                      style={{ 
+                        background: 'transparent', 
+                        border: 'none', 
+                        color: 'rgba(255,255,255,0.5)', 
+                        fontSize: '12px', 
+                        cursor: 'pointer', 
+                        padding: 0
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#667eea'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
+                    >
+                      or choose from Gallery
+                    </button>
+                  </div>
+                  
                   <input
                     type="file"
                     id="ad-image-upload-novo"
@@ -1608,32 +1654,12 @@ Generate a professional, eye-catching ad image.`
                     onChange={handleImageUpload}
                     style={{ display: 'none' }}
                   />
-                  <div style={{ textAlign: 'center', color: isDragging ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.6)', pointerEvents: 'none' }}>
-                    <svg 
-                      width="36" 
-                      height="36" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth="2"
-                      strokeLinecap="round" 
-                      strokeLinejoin="round"
-                      style={{ margin: '0 auto 8px', display: 'block' }}
-                    >
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                      <polyline points="21 15 16 10 5 21"></polyline>
-                    </svg>
-                    <p style={{ fontSize: '12px', fontWeight: '500', margin: 0 }}>
-                      {isDragging ? 'Drop image here' : 'Click or drag to upload image'}
-                    </p>
-                    <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>PNG, JPG up to 10MB</p>
-                  </div>
                 </div>
               )}
             </div>
 
-            {/* 2. Choose Design Template (Optional) */}
+            {/* 2. Choose Design Template (Optional) - Only show when image is uploaded */}
+            {uploadedImage && (
             <div style={{
               background: 'rgba(0, 0, 0, 0.4)',
               borderRadius: '24px',
@@ -1762,9 +1788,45 @@ Generate a professional, eye-catching ad image.`
                   <span style={{ fontSize: '11px', opacity: 0.7 }}>AI will create your ad matching the selected design style</span>
                 </button>
               )}
+              
+              {/* Continue without template button */}
+              {!selectedTemplate && !templateStepCompleted && (
+                <button
+                  onClick={() => setTemplateStepCompleted(true)}
+                  style={{
+                    width: '100%',
+                    marginTop: '12px',
+                    padding: '10px 16px',
+                    background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '8px',
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'
+                    e.currentTarget.style.color = '#fff'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.7)'
+                  }}
+                >
+                  Continue without template →
+                </button>
+              )}
             </div>
+            )}
 
-            {/* 3. Ad Requirements */}
+            {/* 3. Ad Requirements - Only show after template step is completed */}
+            {uploadedImage && (selectedTemplate || templateStepCompleted) && (
             <div style={{
               background: 'rgba(0, 0, 0, 0.4)',
               borderRadius: '24px',
@@ -1774,87 +1836,19 @@ Generate a professional, eye-catching ad image.`
               WebkitBackdropFilter: 'blur(20px)',
               boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>3. Ad Requirements</h3>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={generateExample}
-                    disabled={generatingExample || !uploadedImage}
-                    style={{
-                      padding: '6px 12px',
-                      background: generatingExample || !uploadedImage ? 'rgba(0, 0, 0, 0.2)' : 'rgba(102, 126, 234, 0.2)',
-                      color: generatingExample || !uploadedImage ? 'rgba(255,255,255,0.4)' : '#667eea',
-                      border: generatingExample || !uploadedImage ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(102, 126, 234, 0.3)',
-                      borderRadius: '8px',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      cursor: generatingExample || !uploadedImage ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.2s',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      backdropFilter: 'blur(10px)'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!generatingExample && uploadedImage) {
-                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.3)'
-                        e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!generatingExample && uploadedImage) {
-                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
-                        e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
-                      }
-                    }}
-                  >
-                    {generatingExample ? '...' : '✨ AI Example'}
-                  </button>
-                  <button
-                    onClick={expandText}
-                    disabled={expandingText || !prompt.trim()}
-                    style={{
-                      padding: '6px 12px',
-                      background: expandingText || !prompt.trim() ? 'rgba(0, 0, 0, 0.2)' : 'rgba(102, 126, 234, 0.2)',
-                      color: expandingText || !prompt.trim() ? 'rgba(255,255,255,0.4)' : '#667eea',
-                      border: expandingText || !prompt.trim() ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(102, 126, 234, 0.3)',
-                      borderRadius: '8px',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      cursor: expandingText || !prompt.trim() ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.2s',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      backdropFilter: 'blur(10px)'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!expandingText && prompt.trim()) {
-                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.3)'
-                        e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!expandingText && prompt.trim()) {
-                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
-                        e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
-                      }
-                    }}
-                  >
-                    {expandingText ? '...' : '📝 Expand'}
-                  </button>
-                </div>
-              </div>
+              <h3 style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 12px 0' }}>3. Ad Requirements</h3>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe what kind of ad you want to create...&#10;&#10;Example:&#10;Create a modern, eye-catching ad for a summer fashion collection. Include bold text overlay with 'Summer Sale 50% Off'. Use vibrant colors and make it feel energetic and trendy."
+                placeholder="Describe your ad (e.g. Summer Sale 50% Off, elegant style, gold text)"
                 style={{
                   width: '100%',
-                  height: '80px',
-                  padding: '10px',
+                  height: '60px',
+                  padding: '12px',
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: '8px',
-                  fontSize: '12px',
-                  lineHeight: '1.6',
+                  fontSize: '13px',
+                  lineHeight: '1.5',
                   resize: 'none',
                   outline: 'none',
                   background: 'rgba(0, 0, 0, 0.2)',
@@ -1872,9 +1866,10 @@ Generate a professional, eye-catching ad image.`
                 }}
               />
             </div>
+            )}
 
-            {/* 4. Aspect Ratio Selection */}
-            {selectedAdType === 'instagram' && (
+            {/* 4. Aspect Ratio Selection - Only show after prompt is entered */}
+            {uploadedImage && (selectedTemplate || templateStepCompleted) && prompt.trim() && selectedAdType === 'instagram' && (
               <div style={{
                 background: 'rgba(0, 0, 0, 0.4)',
                 borderRadius: '24px',
@@ -1945,32 +1940,33 @@ Generate a professional, eye-catching ad image.`
               </div>
             )}
 
-            {/* Generate Button */}
+            {/* Generate Button - Only show after prompt is entered */}
+            {uploadedImage && (selectedTemplate || templateStepCompleted) && prompt.trim() && (
             <button
               onClick={generateAd}
-              disabled={loading || !uploadedImage || !prompt.trim()}
+              disabled={loading || !prompt.trim()}
               style={{
                 width: '100%',
-                padding: '12px',
-                background: loading || !uploadedImage || !prompt.trim() ? 'rgba(0, 0, 0, 0.2)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: loading || !uploadedImage || !prompt.trim() ? 'rgba(255,255,255,0.4)' : '#fff',
+                padding: '14px',
+                background: loading || !prompt.trim() ? 'rgba(0, 0, 0, 0.2)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: loading || !prompt.trim() ? 'rgba(255,255,255,0.4)' : '#fff',
                 border: 'none',
-                fontSize: '12px',
+                fontSize: '13px',
                 fontWeight: '600',
-                cursor: loading || !uploadedImage || !prompt.trim() ? 'not-allowed' : 'pointer',
-                borderRadius: '8px',
+                cursor: loading || !prompt.trim() ? 'not-allowed' : 'pointer',
+                borderRadius: '12px',
                 transition: 'all 0.2s',
-                boxShadow: loading || !uploadedImage || !prompt.trim() ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.3)',
+                boxShadow: loading || !prompt.trim() ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.3)',
                 backdropFilter: 'blur(10px)'
               }}
               onMouseEnter={(e) => {
-                if (!loading && uploadedImage && prompt.trim()) {
+                if (!loading && prompt.trim()) {
                   e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)'
                   e.currentTarget.style.transform = 'translateY(-2px)'
                 }
               }}
               onMouseLeave={(e) => {
-                if (!loading && uploadedImage && prompt.trim()) {
+                if (!loading && prompt.trim()) {
                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
                   e.currentTarget.style.transform = 'translateY(0)'
                 }
@@ -1978,6 +1974,7 @@ Generate a professional, eye-catching ad image.`
             >
               {loading ? 'Generating Ad...' : 'Generate Ad'}
             </button>
+            )}
 
             {error && (
               <div style={{ 
@@ -2012,23 +2009,175 @@ Generate a professional, eye-catching ad image.`
             overflow: 'hidden'
           }}>
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ 
+                width: '100%', 
+                height: '100%', 
+                minHeight: '400px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                overflow: 'hidden',
+                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 50%, rgba(234, 102, 174, 0.1) 100%)'
+              }}>
+                {/* Animated background gradient */}
                 <div style={{
-                  width: '50px',
-                  height: '50px',
-                  border: '4px solid rgba(255,255,255,0.1)',
-                  borderTopColor: '#667eea',
-                  borderRadius: '50%',
-                  margin: '0 auto 24px',
-                  animation: 'spin 1s linear infinite'
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(45deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15), rgba(234, 102, 174, 0.15), rgba(102, 126, 234, 0.15))',
+                  backgroundSize: '400% 400%',
+                  animation: 'gradientShift 3s ease infinite'
                 }}></div>
-                <p style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>
-                  {error && error.includes('Retrying') ? error : 'Creating your ad...'}
-                </p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)' }}>
-                  {error && error.includes('Retrying') ? 'Server is busy, please wait...' : 'This may take 15-60 seconds'}
-                </p>
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                
+                {/* Floating fashion elements */}
+                <div style={{ position: 'absolute', top: '10%', left: '15%', animation: 'float1 4s ease-in-out infinite', fontSize: '28px', opacity: 0.6 }}>✨</div>
+                <div style={{ position: 'absolute', top: '20%', right: '20%', animation: 'float2 5s ease-in-out infinite', fontSize: '24px', opacity: 0.5 }}>👗</div>
+                <div style={{ position: 'absolute', bottom: '25%', left: '10%', animation: 'float3 4.5s ease-in-out infinite', fontSize: '22px', opacity: 0.5 }}>💎</div>
+                <div style={{ position: 'absolute', bottom: '15%', right: '15%', animation: 'float1 5.5s ease-in-out infinite', fontSize: '26px', opacity: 0.6 }}>⭐</div>
+                <div style={{ position: 'absolute', top: '40%', left: '8%', animation: 'float2 4s ease-in-out infinite', fontSize: '20px', opacity: 0.4 }}>🎨</div>
+                <div style={{ position: 'absolute', top: '35%', right: '8%', animation: 'float3 5s ease-in-out infinite', fontSize: '20px', opacity: 0.4 }}>✂️</div>
+                <div style={{ position: 'absolute', bottom: '35%', left: '20%', animation: 'sparkle 2s ease-in-out infinite', fontSize: '16px', opacity: 0.7 }}>✦</div>
+                <div style={{ position: 'absolute', top: '15%', left: '40%', animation: 'sparkle 2.5s ease-in-out infinite 0.5s', fontSize: '14px', opacity: 0.6 }}>✦</div>
+                <div style={{ position: 'absolute', bottom: '20%', right: '35%', animation: 'sparkle 2s ease-in-out infinite 1s', fontSize: '18px', opacity: 0.7 }}>✦</div>
+                
+                {/* Main content */}
+                <div style={{ position: 'relative', zIndex: 10, textAlign: 'center' }}>
+                  {/* Pulsing fashion icon */}
+                  <div style={{
+                    width: '100px',
+                    height: '100px',
+                    margin: '0 auto 32px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    animation: 'pulse 2s ease-in-out infinite',
+                    boxShadow: '0 0 60px rgba(102, 126, 234, 0.4)',
+                    border: '2px solid rgba(255,255,255,0.1)'
+                  }}>
+                    <div style={{
+                      width: '70px',
+                      height: '70px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      animation: 'innerPulse 2s ease-in-out infinite 0.5s',
+                      boxShadow: '0 0 30px rgba(102, 126, 234, 0.6)'
+                    }}>
+                      <span style={{ fontSize: '32px', animation: 'iconBounce 1s ease-in-out infinite' }}>🎨</span>
+                    </div>
+                  </div>
+                  
+                  {/* Masterbot Fashion branding */}
+                  <div style={{ 
+                    fontSize: '12px', 
+                    fontWeight: '600', 
+                    color: 'rgba(255,255,255,0.5)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '3px',
+                    marginBottom: '8px'
+                  }}>
+                    Masterbot Fashion
+                  </div>
+                  
+                  {/* Animated text */}
+                  <h2 style={{ 
+                    fontSize: '22px', 
+                    fontWeight: '700', 
+                    marginBottom: '16px',
+                    background: 'linear-gradient(90deg, #fff, #667eea, #764ba2, #ea66ae, #fff)',
+                    backgroundSize: '300% auto',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    animation: 'shimmer 3s linear infinite'
+                  }}>
+                    {error && error.includes('Retrying') ? 'Retrying...' : 'Designing Your Ad'}
+                  </h2>
+                  
+                  {/* Rotating status messages */}
+                  <div style={{ 
+                    fontSize: '13px', 
+                    color: 'rgba(255,255,255,0.7)',
+                    marginBottom: '24px',
+                    minHeight: '20px'
+                  }}>
+                    <span style={{ animation: 'fadeInOut 4s ease-in-out infinite' }}>
+                      {error && error.includes('Retrying') ? 'Server is busy, please wait...' : '✨ AI is crafting your perfect ad...'}
+                    </span>
+                  </div>
+                  
+                  {/* Progress dots */}
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#667eea', animation: 'dotPulse 1.5s ease-in-out infinite' }}></div>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#764ba2', animation: 'dotPulse 1.5s ease-in-out infinite 0.3s' }}></div>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ea66ae', animation: 'dotPulse 1.5s ease-in-out infinite 0.6s' }}></div>
+                  </div>
+                  
+                  {/* Time estimate */}
+                  <p style={{ 
+                    fontSize: '12px', 
+                    color: 'rgba(255,255,255,0.4)',
+                    marginTop: '24px'
+                  }}>
+                    Usually takes 15-60 seconds
+                  </p>
+                </div>
+                
+                {/* CSS Animations */}
+                <style>{`
+                  @keyframes gradientShift {
+                    0% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
+                  }
+                  @keyframes float1 {
+                    0%, 100% { transform: translateY(0) rotate(0deg); }
+                    50% { transform: translateY(-20px) rotate(10deg); }
+                  }
+                  @keyframes float2 {
+                    0%, 100% { transform: translateY(0) rotate(0deg); }
+                    50% { transform: translateY(-15px) rotate(-10deg); }
+                  }
+                  @keyframes float3 {
+                    0%, 100% { transform: translateY(0) scale(1); }
+                    50% { transform: translateY(-25px) scale(1.1); }
+                  }
+                  @keyframes sparkle {
+                    0%, 100% { opacity: 0.3; transform: scale(1); }
+                    50% { opacity: 1; transform: scale(1.3); }
+                  }
+                  @keyframes pulse {
+                    0%, 100% { transform: scale(1); box-shadow: 0 0 60px rgba(102, 126, 234, 0.4); }
+                    50% { transform: scale(1.05); box-shadow: 0 0 80px rgba(102, 126, 234, 0.6); }
+                  }
+                  @keyframes innerPulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.1); }
+                  }
+                  @keyframes iconBounce {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-5px); }
+                  }
+                  @keyframes shimmer {
+                    0% { background-position: -200% center; }
+                    100% { background-position: 200% center; }
+                  }
+                  @keyframes fadeInOut {
+                    0%, 100% { opacity: 0.7; }
+                    50% { opacity: 1; }
+                  }
+                  @keyframes dotPulse {
+                    0%, 100% { transform: scale(1); opacity: 0.5; }
+                    50% { transform: scale(1.5); opacity: 1; }
+                  }
+                `}</style>
               </div>
             ) : generatedAd ? (
               <div style={{ 
@@ -2281,6 +2430,7 @@ Generate a professional, eye-catching ad image.`
                       setImageFile(null)
                       setPrompt('')
                       setSelectedTemplate(null)
+                      setTemplateStepCompleted(false)
                       setGeneratedCaption('')
                       if (selectedAdType) {
                         const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
@@ -2296,6 +2446,7 @@ Generate a professional, eye-catching ad image.`
                         safeLocalStorage.removeItem(`${prefix}_facebookCaption`)
                         safeLocalStorage.removeItem(`${prefix}_emailCaption`)
                         safeLocalStorage.removeItem(`${prefix}_emailSubject`)
+                        safeLocalStorage.removeItem(`${prefix}_caption`)
                       }
                     }}
                     style={{
@@ -2438,7 +2589,15 @@ Generate a professional, eye-catching ad image.`
                   </div>
                   <textarea
                     value={generatedCaption}
-                    onChange={(e) => setGeneratedCaption(e.target.value)}
+                    onChange={(e) => {
+                      const newCaption = e.target.value
+                      setGeneratedCaption(newCaption)
+                      // Save to localStorage
+                      if (selectedAdType) {
+                        const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+                        safeLocalStorage.setItem(`${prefix}_caption`, newCaption)
+                      }
+                    }}
                     placeholder={generatingCaption ? "✨ Generating caption with AI..." : "Enter your caption here or click Regenerate for AI caption..."}
                     style={{
                       width: '100%',
@@ -2896,6 +3055,7 @@ Generate a professional, eye-catching ad image.`
                     key={template.id}
                     onClick={() => {
                       setSelectedTemplate({ ...template, ratio: templatePickerTab })
+                      setTemplateStepCompleted(true) // Mark template step as completed
                       setAspectRatio(templatePickerTab === '4:5' ? '4:5' : '1:1')
                       setShowTemplatePicker(false)
                     }}
@@ -2975,6 +3135,183 @@ Generate a professional, eye-catching ad image.`
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Gallery Picker Modal */}
+      {showGalleryPicker && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setShowGalleryPicker(false)}
+        >
+          <div 
+            style={{
+              background: 'linear-gradient(180deg, rgba(30, 30, 40, 0.98) 0%, rgba(20, 20, 30, 0.98) 100%)',
+              borderRadius: '24px',
+              width: '100%',
+              maxWidth: '800px',
+              maxHeight: '85vh',
+              overflow: 'hidden',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h2 style={{ fontSize: '20px', fontWeight: '700', margin: 0, color: '#fff' }}>
+                  Select from Gallery
+                </h2>
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', margin: '4px 0 0 0' }}>
+                  Choose from your generated images and dressed models
+                </p>
+              </div>
+              <button
+                onClick={() => setShowGalleryPicker(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  borderRadius: '10px',
+                  width: '36px',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontSize: '18px',
+                  color: 'rgba(255,255,255,0.7)',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Gallery Grid */}
+            <div style={{
+              padding: '20px 24px',
+              overflowY: 'auto',
+              maxHeight: 'calc(85vh - 100px)'
+            }}>
+              {loadingGallery ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.5)' }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    border: '3px solid rgba(255,255,255,0.1)',
+                    borderTopColor: '#667eea',
+                    borderRadius: '50%',
+                    margin: '0 auto 16px',
+                    animation: 'spin 1s linear infinite'
+                  }}></div>
+                  Loading your images...
+                </div>
+              ) : galleryItems.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.5)' }}>
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 16px', display: 'block', opacity: 0.5 }}>
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                  </svg>
+                  <p style={{ margin: 0, fontSize: '14px' }}>No images in your gallery yet</p>
+                  <p style={{ margin: '8px 0 0 0', fontSize: '12px', opacity: 0.7 }}>Generate some dressed models or ads first</p>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                  gap: '12px'
+                }}>
+                  {galleryItems.map((item: any) => (
+                    <button
+                      key={item.id}
+                      onClick={() => selectFromGallery(item)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '2px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '12px',
+                        padding: '8px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.15)'
+                        e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.4)'
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                        e.currentTarget.style.transform = 'translateY(0)'
+                      }}
+                    >
+                      <div style={{
+                        width: '100%',
+                        aspectRatio: '1',
+                        borderRadius: '8px',
+                        overflow: 'hidden'
+                      }}>
+                        <img 
+                          src={item.image_url}
+                          alt={item.title || 'Gallery item'}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                        />
+                      </div>
+                      <span style={{ 
+                        fontSize: '10px', 
+                        fontWeight: '500',
+                        color: 'rgba(255,255,255,0.6)',
+                        textAlign: 'center',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {item.content_type === 'dressed_model' ? '👗 Dressed Model' : 
+                         item.content_type === 'instagram_ad' ? '📸 Instagram Ad' :
+                         item.content_type === 'facebook_ad' ? '📘 Facebook Ad' :
+                         item.content_type === 'generated_image' ? '🖼️ Generated' :
+                         '🎨 Image'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
