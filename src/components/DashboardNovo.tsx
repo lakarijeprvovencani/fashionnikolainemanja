@@ -23,6 +23,7 @@ import ViewModels from './ViewModels'
 import ViewModelsNovo from './ViewModelsNovo'
 import GenerateVideoView from './GenerateVideoView'
 import GenerateVideoNovo from './GenerateVideoNovo'
+import CaptionGeneratorNovo from './CaptionGeneratorNovo'
 import CreateCaptionsView from './CreateCaptionsView'
 import CreateCaptionsNovo from './CreateCaptionsNovo'
 import EditImageView from './EditImageView'
@@ -230,8 +231,8 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
       adType={null}
       onBack={() => setInternalView('dashboard')}
       onNavigate={(view) => {
-        // Handle internal navigation for edit-image, generate-video, create-captions, analytics, content-calendar, meta-connect
-        if (view === 'edit-image' || view === 'generate-video' || view === 'create-captions' || view === 'analytics' || view === 'content-calendar' || view === 'meta-connect') {
+        // Handle internal navigation for edit-image, generate-video, create-captions, analytics, content-calendar, meta-connect, and caption generators
+        if (view === 'edit-image' || view === 'generate-video' || view === 'create-captions' || view === 'analytics' || view === 'content-calendar' || view === 'meta-connect' || view === 'caption-instagram' || view === 'caption-facebook' || view === 'caption-tiktok' || view === 'caption-email') {
           setInternalView(view)
         } else {
           onNavigate(view)
@@ -294,6 +295,39 @@ const DashboardNovo: React.FC<DashboardNovoProps> = ({ onBack, onNavigate }) => 
     return <AnalyticsNovo 
       onBack={() => setInternalView('dashboard')}
       onNavigate={onNavigate}
+    />
+  }
+
+  // Caption Generator pages
+  if (internalView === 'caption-instagram') {
+    return <CaptionGeneratorNovo 
+      platform="instagram"
+      onBack={() => setInternalView('marketing')}
+      onNavigate={(view) => setInternalView(view)}
+    />
+  }
+
+  if (internalView === 'caption-facebook') {
+    return <CaptionGeneratorNovo 
+      platform="facebook"
+      onBack={() => setInternalView('marketing')}
+      onNavigate={(view) => setInternalView(view)}
+    />
+  }
+
+  if (internalView === 'caption-tiktok') {
+    return <CaptionGeneratorNovo 
+      platform="tiktok"
+      onBack={() => setInternalView('marketing')}
+      onNavigate={(view) => setInternalView(view)}
+    />
+  }
+
+  if (internalView === 'caption-email') {
+    return <CaptionGeneratorNovo 
+      platform="email"
+      onBack={() => setInternalView('marketing')}
+      onNavigate={(view) => setInternalView(view)}
     />
   }
 

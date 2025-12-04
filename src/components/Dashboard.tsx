@@ -20,6 +20,7 @@ import BrandMemoryMapBanner from './BrandMemoryMapBanner'
 import BrandProfileUpgrade from './BrandProfileUpgrade'
 import HistoryGallery from './HistoryGallery'
 import DashboardNovo from './DashboardNovo'
+import CaptionGeneratorNovo from './CaptionGeneratorNovo'
 import MetaCallback from '../pages/MetaCallback'
 
 interface FashionModel {
@@ -38,7 +39,7 @@ const Dashboard: React.FC = () => {
   const [modelsCount, setModelsCount] = useState(0)
   const [dressedModelsCount, setDressedModelsCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'create-model-upload' | 'create-model-ai' | 'dress-model' | 'view-models' | 'gallery' | 'subscription' | 'pricing' | 'edit-image' | 'generate-video' | 'create-captions' | 'marketing' | 'create-instagram-ad' | 'create-facebook-ad' | 'content-calendar' | 'analytics' | 'brand-memory-map' | 'brand-profile-upgrade' | 'history-gallery' | 'novo'>('dashboard')
+  const [currentView, setCurrentView] = useState<'dashboard' | 'create-model' | 'create-model-upload' | 'create-model-ai' | 'dress-model' | 'view-models' | 'gallery' | 'subscription' | 'pricing' | 'edit-image' | 'generate-video' | 'create-captions' | 'marketing' | 'create-instagram-ad' | 'create-facebook-ad' | 'content-calendar' | 'analytics' | 'brand-memory-map' | 'brand-profile-upgrade' | 'history-gallery' | 'novo' | 'caption-instagram' | 'caption-facebook' | 'caption-tiktok' | 'caption-email'>('dashboard')
   const [selectedModelForDressing, setSelectedModelForDressing] = useState<FashionModel | null>(null)
   const [showCreateMenu, setShowCreateMenu] = useState(false)
   const [currentGeneratedImage, setCurrentGeneratedImage] = useState<string | null>(null)
@@ -307,6 +308,47 @@ const Dashboard: React.FC = () => {
     return (
       <ContentCalendarView 
         onBack={() => setCurrentView('dashboard')}
+        onNavigate={(view) => setCurrentView(view as any)}
+      />
+    )
+  }
+
+  // Caption Generator pages
+  if (currentView === 'caption-instagram') {
+    return (
+      <CaptionGeneratorNovo 
+        platform="instagram"
+        onBack={() => setCurrentView('marketing')}
+        onNavigate={(view) => setCurrentView(view as any)}
+      />
+    )
+  }
+
+  if (currentView === 'caption-facebook') {
+    return (
+      <CaptionGeneratorNovo 
+        platform="facebook"
+        onBack={() => setCurrentView('marketing')}
+        onNavigate={(view) => setCurrentView(view as any)}
+      />
+    )
+  }
+
+  if (currentView === 'caption-tiktok') {
+    return (
+      <CaptionGeneratorNovo 
+        platform="tiktok"
+        onBack={() => setCurrentView('marketing')}
+        onNavigate={(view) => setCurrentView(view as any)}
+      />
+    )
+  }
+
+  if (currentView === 'caption-email') {
+    return (
+      <CaptionGeneratorNovo 
+        platform="email"
+        onBack={() => setCurrentView('marketing')}
         onNavigate={(view) => setCurrentView(view as any)}
       />
     )
