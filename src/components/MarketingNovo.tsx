@@ -440,6 +440,7 @@ Provide an expanded, more detailed version that includes:
 
     setLoading(true)
     setError('')
+    setGeneratedCaption('') // Reset caption when generating new ad - user will need to click "Prepare for Social Media" again
 
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY
@@ -769,11 +770,30 @@ Generate a professional, eye-catching ad image.`
         console.error('❌ Database save error:', dbErr)
       }
 
-      // Auto-generate caption in background (don't block UI)
-      console.log('📝 Auto-generating caption...')
-      setGeneratingCaption(true)
-      generateSocialMediaCaptions({
-        imageUrl: generatedImageUrl,
+      // Caption will be generated when user clicks "Prepare for Social Media"
+      // This allows user to generate multiple ads with different templates before preparing for social media
+      console.log('✅ Ad generated successfully. User can now prepare for social media or generate more variations.')
+
+    } catch (err: any) {
+      console.error('Error generating ad:', err)
+      setError(err.message || 'Failed to generate ad. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Prepare for Social Media - generates caption and switches to preview
+  const prepareForSocialMedia = async () => {
+    if (!generatedAd || !user) {
+      alert('Please generate an ad first')
+      return
+    }
+
+    setGeneratingCaption(true)
+    try {
+      console.log('📝 Generating caption for social media...')
+      const captions = await generateSocialMediaCaptions({
+        imageUrl: generatedAd,
         clothingDescription: prompt,
         userId: user.id,
         instagramOptions: {
@@ -781,24 +801,43 @@ Generate a professional, eye-catching ad image.`
           length: 'medium',
           hashtags: true
         }
-      }).then((captions) => {
-        console.log('✅ Caption generated successfully')
-        setGeneratedCaption(captions.instagram || '')
-        setGeneratingCaption(false)
-        // Auto-switch to preview tab when caption is ready
-        setActiveTab('preview')
-      }).catch((captionErr) => {
-        console.error('⚠️ Caption generation failed:', captionErr)
-        setGeneratingCaption(false)
-        // Still switch to preview even if caption fails
-        setActiveTab('preview')
       })
-
-    } catch (err: any) {
-      console.error('Error generating ad:', err)
-      setError(err.message || 'Failed to generate ad. Please try again.')
+      console.log('✅ Caption generated successfully')
+      setGeneratedCaption(captions.instagram || '')
+      setActiveTab('preview')
+    } catch (captionErr) {
+      console.error('⚠️ Caption generation failed:', captionErr)
+      // Still switch to preview even if caption fails - user can write manually
+      setActiveTab('preview')
     } finally {
-      setLoading(false)
+      setGeneratingCaption(false)
+    }
+  }
+
+  // Regenerate caption
+  const regenerateCaption = async () => {
+    if (!generatedAd || !user) return
+
+    setGeneratingCaption(true)
+    try {
+      console.log('🔄 Regenerating caption...')
+      const captions = await generateSocialMediaCaptions({
+        imageUrl: generatedAd,
+        clothingDescription: prompt,
+        userId: user.id,
+        instagramOptions: {
+          tone: 'medium',
+          length: 'medium',
+          hashtags: true
+        }
+      })
+      console.log('✅ Caption regenerated successfully')
+      setGeneratedCaption(captions.instagram || '')
+    } catch (captionErr) {
+      console.error('⚠️ Caption regeneration failed:', captionErr)
+      alert('Failed to regenerate caption. Please try again.')
+    } finally {
+      setGeneratingCaption(false)
     }
   }
 
@@ -944,10 +983,10 @@ Generate a professional, eye-catching ad image.`
 
           <div style={{ marginTop: '40px' }}>
             <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '12px', letterSpacing: '-0.5px', textAlign: 'center' }}>
-              Create Instagram Ad
+              Create Social Media Ad
             </h2>
             <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: '32px', maxWidth: '500px', margin: '0 auto 32px' }}>
-              Create professional ads for Instagram
+              Create professional ads for social media platforms
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', maxWidth: '900px', margin: '0 auto' }}>
               <div
@@ -970,9 +1009,9 @@ Generate a professional, eye-catching ad image.`
                   width: '100%'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                  e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)'
                   e.currentTarget.style.transform = 'translateY(-4px)'
-                  e.currentTarget.style.boxShadow = '0 24px 48px rgba(0,0,0,0.4)'
+                  e.currentTarget.style.boxShadow = '0 24px 48px rgba(102, 126, 234, 0.2)'
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
@@ -984,21 +1023,24 @@ Generate a professional, eye-catching ad image.`
                   width: '56px', 
                   height: '56px', 
                   borderRadius: '16px', 
-                  background: 'linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%)', 
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center',
-                  margin: '0 auto 16px'
+                  margin: '0 auto 16px',
+                  boxShadow: '0 8px 24px rgba(102, 126, 234, 0.4)'
                 }}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    <circle cx="12" cy="2" r="1" fill="white"></circle>
                   </svg>
                 </div>
                 <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '6px' }}>
-                  Instagram Ad
+                  Social Media Ad
                 </h3>
                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', margin: 0 }}>
-                  Create engaging Instagram ads
+                  Create engaging ads for all platforms
                 </p>
               </div>
             </div>
@@ -1316,7 +1358,7 @@ Generate a professional, eye-catching ad image.`
                 opacity: !generatedAd ? 0.5 : 1
               }}
             >
-              Preview & Schedule {generatingCaption && '✨'}
+              Preview & Schedule
             </button>
           </div>
         )}
@@ -1889,118 +1931,19 @@ Generate a professional, eye-catching ad image.`
                 {/* Action Buttons */}
                 <div style={{ 
                   padding: '16px', 
-                  background: 'rgba(0, 0, 0, 0.3)', 
-                  borderTop: '1px solid rgba(255, 255, 255, 0.1)', 
+                  background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.4) 100%)', 
+                  borderTop: '1px solid rgba(255, 255, 255, 0.08)', 
                   flexShrink: 0,
                   width: '100%'
                 }}>
-                  {/* Top Row */}
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: '1fr', 
-                    gap: '10px',
-                    marginBottom: '10px'
-                  }}>
-                    <button
-                      onClick={() => {
-                        if (generatedAd && selectedAdType) {
-                          const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
-                          safeLocalStorage.setItem(`${prefix}_editImage`, generatedAd)
-                        }
-                        safeLocalStorage.setItem('editImage_previousView', 'marketing')
-                        safeLocalStorage.setItem('editImage_adType', selectedAdType || 'instagram')
-                        onNavigate('edit-image')
-                      }}
-                      style={{
-                        padding: '10px',
-                        background: 'rgba(0, 0, 0, 0.2)',
-                        color: 'rgba(255,255,255,0.9)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        borderRadius: '8px',
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        backdropFilter: 'blur(10px)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
-                        e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
-                        e.currentTarget.style.transform = 'translateY(-2px)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)'
-                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
-                        e.currentTarget.style.transform = 'translateY(0)'
-                      }}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                      </svg>
-                      <span>Edit Image</span>
-                    </button>
-                  </div>
-
-                  {/* Second Row */}
+                  {/* Action Buttons - Stylish Grid */}
                   <div style={{ 
                     display: 'grid', 
                     gridTemplateColumns: '1fr 1fr', 
-                    gap: '10px',
-                    marginBottom: '10px'
+                    gap: '12px',
+                    marginBottom: '12px'
                   }}>
-                    <button
-                      onClick={() => {
-                        if (generatedAd && selectedAdType) {
-                          const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
-                          safeLocalStorage.setItem(`${prefix}_captionsImage`, generatedAd)
-                        }
-                        if (prompt && selectedAdType) {
-                          const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
-                          safeLocalStorage.setItem(`${prefix}_captionsPrompt`, prompt)
-                        }
-                        safeLocalStorage.setItem('captions_previousView', 'marketing')
-                        safeLocalStorage.setItem('captions_adType', selectedAdType || 'instagram')
-                        onNavigate('create-captions')
-                      }}
-                      style={{
-                        padding: '10px',
-                        background: 'rgba(0, 0, 0, 0.2)',
-                        color: 'rgba(255,255,255,0.9)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        borderRadius: '8px',
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        backdropFilter: 'blur(10px)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
-                        e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
-                        e.currentTarget.style.transform = 'translateY(-2px)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)'
-                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
-                        e.currentTarget.style.transform = 'translateY(0)'
-                      }}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                      </svg>
-                      <span>Captions</span>
-                    </button>
+                    {/* Download Button */}
                     <button
                       onClick={() => {
                         if (!generatedAd) return
@@ -2013,53 +1956,197 @@ Generate a professional, eye-catching ad image.`
                       }}
                       disabled={!generatedAd}
                       style={{
-                        padding: '10px',
-                        background: !generatedAd ? 'rgba(0, 0, 0, 0.2)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: '#ffffff',
-                        border: 'none',
+                        padding: '16px 12px',
+                        background: 'linear-gradient(145deg, rgba(40, 40, 50, 0.9) 0%, rgba(25, 25, 35, 0.9) 100%)',
+                        color: '#fff',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
                         fontSize: '12px',
                         fontWeight: '600',
-                        cursor: !generatedAd ? 'default' : 'pointer',
-                        borderRadius: '8px',
-                        transition: 'all 0.2s',
+                        cursor: !generatedAd ? 'not-allowed' : 'pointer',
+                        borderRadius: '14px',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '6px',
-                        backdropFilter: 'blur(10px)',
-                        opacity: !generatedAd ? 0.5 : 1,
-                        boxShadow: !generatedAd ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.3)'
+                        gap: '8px',
+                        opacity: !generatedAd ? 0.4 : 1,
+                        position: 'relative',
+                        overflow: 'hidden'
                       }}
                       onMouseEnter={(e) => {
                         if (generatedAd) {
-                          e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.4)'
-                          e.currentTarget.style.transform = 'translateY(-2px)'
+                          e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)'
+                          e.currentTarget.style.boxShadow = '0 12px 28px rgba(102, 126, 234, 0.25)'
+                          e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.4)'
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (generatedAd) {
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.3)'
-                          e.currentTarget.style.transform = 'translateY(0)'
+                          e.currentTarget.style.transform = 'translateY(0) scale(1)'
+                          e.currentTarget.style.boxShadow = 'none'
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
                         }
                       }}
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                      </svg>
-                      <span>Download</span>
+                      <div style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '10px',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                      }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                          <polyline points="7 10 12 15 17 10"></polyline>
+                          <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                      </div>
+                      <span style={{ letterSpacing: '0.3px' }}>Download</span>
+                    </button>
+
+                    {/* Edit Image Button */}
+                    <button
+                      onClick={() => {
+                        if (generatedAd && selectedAdType) {
+                          const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+                          safeLocalStorage.setItem(`${prefix}_editImage`, generatedAd)
+                        }
+                        if (prompt && selectedAdType) {
+                          const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
+                          safeLocalStorage.setItem(`${prefix}_editPrompt`, prompt)
+                        }
+                        safeLocalStorage.setItem('editImage_previousView', 'marketing')
+                        safeLocalStorage.setItem('editImage_adType', selectedAdType || 'instagram')
+                        onNavigate('edit-image')
+                      }}
+                      style={{
+                        padding: '16px 12px',
+                        background: 'linear-gradient(145deg, rgba(40, 40, 50, 0.9) 0%, rgba(25, 25, 35, 0.9) 100%)',
+                        color: '#fff',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        borderRadius: '14px',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)'
+                        e.currentTarget.style.boxShadow = '0 12px 28px rgba(118, 75, 162, 0.25)'
+                        e.currentTarget.style.borderColor = 'rgba(118, 75, 162, 0.4)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0) scale(1)'
+                        e.currentTarget.style.boxShadow = 'none'
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+                      }}
+                    >
+                      <div style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '10px',
+                        background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(118, 75, 162, 0.3)'
+                      }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                      </div>
+                      <span style={{ letterSpacing: '0.3px' }}>Edit Image</span>
                     </button>
                   </div>
 
-                  {/* Reset Button */}
+                  {/* Prepare for Social Media Button */}
+                  <button
+                    onClick={prepareForSocialMedia}
+                    disabled={!generatedAd || generatingCaption}
+                    style={{
+                      width: '100%',
+                      padding: '16px 20px',
+                      background: !generatedAd 
+                        ? 'linear-gradient(145deg, rgba(40, 40, 50, 0.5) 0%, rgba(25, 25, 35, 0.5) 100%)' 
+                        : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      letterSpacing: '0.5px',
+                      cursor: !generatedAd || generatingCaption ? 'not-allowed' : 'pointer',
+                      borderRadius: '14px',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px',
+                      opacity: !generatedAd ? 0.4 : 1,
+                      boxShadow: !generatedAd ? 'none' : '0 8px 24px rgba(102, 126, 234, 0.4)',
+                      marginBottom: '12px',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (generatedAd && !generatingCaption) {
+                        e.currentTarget.style.transform = 'translateY(-3px) scale(1.01)'
+                        e.currentTarget.style.boxShadow = '0 12px 32px rgba(102, 126, 234, 0.5)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (generatedAd && !generatingCaption) {
+                        e.currentTarget.style.transform = 'translateY(0) scale(1)'
+                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(102, 126, 234, 0.4)'
+                      }
+                    }}
+                  >
+                    {generatingCaption ? (
+                      <>
+                        <div style={{
+                          width: '18px',
+                          height: '18px',
+                          border: '2.5px solid rgba(255,255,255,0.3)',
+                          borderTopColor: '#fff',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }}></div>
+                        <span>Preparing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="18" cy="5" r="3"></circle>
+                          <circle cx="6" cy="12" r="3"></circle>
+                          <circle cx="18" cy="19" r="3"></circle>
+                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                        </svg>
+                        <span>Prepare for Social Media</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Reset Button - Subtle */}
                   <button
                     onClick={() => {
                       setGeneratedAd(null)
                       setUploadedImage(null)
                       setImageFile(null)
                       setPrompt('')
+                      setSelectedTemplate(null)
+                      setGeneratedCaption('')
                       if (selectedAdType) {
                         const prefix = selectedAdType === 'instagram' ? 'instagram_ad' : 'facebook_ad'
                         safeLocalStorage.removeItem(`${prefix}_generated`)
@@ -2078,31 +2165,32 @@ Generate a professional, eye-catching ad image.`
                     }}
                     style={{
                       width: '100%',
-                      padding: '10px',
-                      background: 'rgba(220, 38, 38, 0.2)',
-                      color: 'rgba(255,255,255,0.9)',
-                      border: '1px solid rgba(220, 38, 38, 0.3)',
+                      padding: '12px',
+                      background: 'transparent',
+                      color: 'rgba(255,255,255,0.5)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
                       fontSize: '12px',
-                      fontWeight: '600',
+                      fontWeight: '500',
                       cursor: 'pointer',
-                      borderRadius: '8px',
-                      transition: 'all 0.2s',
+                      borderRadius: '12px',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '6px',
-                      backdropFilter: 'blur(10px)'
+                      gap: '8px'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(220, 38, 38, 0.3)'
-                      e.currentTarget.style.borderColor = 'rgba(220, 38, 38, 0.5)'
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'
+                      e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)'
+                      e.currentTarget.style.color = '#ef4444'
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(220, 38, 38, 0.2)'
-                      e.currentTarget.style.borderColor = 'rgba(220, 38, 38, 0.3)'
+                      e.currentTarget.style.background = 'transparent'
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
                     }}
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="1 4 1 10 7 10"></polyline>
                       <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
                     </svg>
@@ -2162,14 +2250,61 @@ Generate a professional, eye-catching ad image.`
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <h3 style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Caption</h3>
-                    {generatingCaption && (
-                      <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>Generating...</span>
-                    )}
+                    <button
+                      onClick={regenerateCaption}
+                      disabled={generatingCaption}
+                      style={{
+                        padding: '4px 10px',
+                        background: generatingCaption ? 'rgba(0, 0, 0, 0.2)' : 'rgba(102, 126, 234, 0.2)',
+                        color: generatingCaption ? 'rgba(255,255,255,0.4)' : '#667eea',
+                        border: generatingCaption ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(102, 126, 234, 0.3)',
+                        borderRadius: '6px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        cursor: generatingCaption ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!generatingCaption) {
+                          e.currentTarget.style.background = 'rgba(102, 126, 234, 0.3)'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!generatingCaption) {
+                          e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
+                        }
+                      }}
+                    >
+                      {generatingCaption ? (
+                        <>
+                          <div style={{
+                            width: '10px',
+                            height: '10px',
+                            border: '2px solid rgba(255,255,255,0.2)',
+                            borderTopColor: 'rgba(255,255,255,0.5)',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite'
+                          }}></div>
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="1 4 1 10 7 10"></polyline>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                          </svg>
+                          <span>Regenerate</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                   <textarea
                     value={generatedCaption}
                     onChange={(e) => setGeneratedCaption(e.target.value)}
-                    placeholder={generatingCaption ? "✨ Generating caption with AI..." : "Enter your caption here..."}
+                    placeholder={generatingCaption ? "✨ Generating caption with AI..." : "Enter your caption here or click Regenerate for AI caption..."}
                     style={{
                       width: '100%',
                       height: '80px',
