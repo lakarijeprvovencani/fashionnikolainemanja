@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { meta } from '../lib/supabase'
-import PageHeader from './PageHeader'
 
 interface MetaConnectNovoProps {
   onBack?: () => void
@@ -47,7 +46,7 @@ const MetaConnectNovo: React.FC<MetaConnectNovoProps> = ({ onBack, onNavigate, o
     }
   }
 
-  const handleConnectMeta = async (platform: 'facebook' | 'instagram') => {
+  const handleConnectMeta = async () => {
     if (!user) {
       alert('Please log in first')
       return
@@ -56,30 +55,19 @@ const MetaConnectNovo: React.FC<MetaConnectNovoProps> = ({ onBack, onNavigate, o
     setConnecting(true)
     try {
       const metaAppId = import.meta.env.VITE_META_APP_ID
-      // Use frontend callback page instead of Edge Function directly
-      // This way we can add authorization header when calling Edge Function
       const redirectUri = `${window.location.origin}/meta-callback`
       console.log('🔵 Redirect URI:', redirectUri)
-      console.log('🔵 Window location origin:', window.location.origin)
 
-      // Using only public_profile scope (works without App Review)
-      // Page permissions (pages_show_list, pages_read_engagement, pages_manage_posts) 
-      // require App Review even for testers - they're not available in development mode
-      // Once you complete App Review, you can add these scopes back
-      const scopes = 'public_profile'
+      // Request both Facebook and Instagram permissions
+      const scopes = 'public_profile,pages_show_list,instagram_basic,instagram_content_publish'
 
-      // Create state parameter with user ID and redirect URI
-      // Edge Function needs the redirect URI to match when exchanging code for token
       const stateData = { 
         userId: user.id, 
-        platform,
-        redirectUri: redirectUri  // Pass redirect URI so Edge Function can use the same one
+        platform: 'facebook', // Facebook auth gives access to both FB and IG
+        redirectUri: redirectUri
       }
       const state = encodeURIComponent(JSON.stringify(stateData))
-      console.log('🔵 State data:', stateData)
-      console.log('🔵 Encoded state:', state)
 
-      // Redirect to Meta OAuth
       let authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
         `client_id=${metaAppId}&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
@@ -87,9 +75,7 @@ const MetaConnectNovo: React.FC<MetaConnectNovoProps> = ({ onBack, onNavigate, o
         `response_type=code&` +
         `scope=${scopes}`
       
-      console.log('🔵 OAuth URL (without state):', authUrl.replace(state, 'STATE_HIDDEN'))
       console.log('🔵 Redirecting to Facebook OAuth...')
-
       window.location.href = authUrl
     } catch (error: any) {
       console.error('Error connecting Meta:', error)
@@ -126,6 +112,9 @@ const MetaConnectNovo: React.FC<MetaConnectNovoProps> = ({ onBack, onNavigate, o
       )
     }
   }
+
+  // Check if already connected
+  const isConnected = connections.length > 0
 
   if (loading) {
     return (
@@ -198,229 +187,309 @@ const MetaConnectNovo: React.FC<MetaConnectNovoProps> = ({ onBack, onNavigate, o
         zIndex: 0
       }}></div>
 
-      <div style={{ position: 'relative', zIndex: 1, padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-        <PageHeader 
-          title="Connect Meta Accounts" 
-          onBack={onBack}
-          onNavigate={onNavigate}
-        />
+      <div style={{ position: 'relative', zIndex: 1, padding: '40px 20px', maxWidth: '600px', margin: '0 auto' }}>
+        {/* Back Button */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '12px',
+              padding: '10px 16px',
+              color: 'rgba(255, 255, 255, 0.8)',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              marginBottom: '32px',
+              backdropFilter: 'blur(10px)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+            }}
+          >
+            <span style={{ fontSize: '18px' }}>←</span>
+            Back
+          </button>
+        )}
 
-        <div style={{ marginTop: '40px' }}>
-          {/* Connect Buttons */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '20px',
-            marginBottom: '40px'
+        {/* Title */}
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <h1 style={{ 
+            fontSize: '32px', 
+            fontWeight: '700', 
+            marginBottom: '12px',
+            letterSpacing: '-0.5px'
           }}>
-            {/* Facebook Connect */}
-            <div style={{
-              background: 'rgba(0, 0, 0, 0.4)',
-              borderRadius: '24px',
-              padding: '32px',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center'
-            }}>
-              <div style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '16px',
-                background: 'linear-gradient(135deg, #1877F2 0%, #0D5FDB 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '20px',
-                color: '#fff'
-              }}>
-                {getPlatformIcon('facebook')}
-              </div>
-              <h3 style={{ fontSize: '20px', fontWeight: '700', margin: '0 0 12px 0' }}>Facebook</h3>
-              <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', margin: '0 0 24px 0', lineHeight: '1.6' }}>
-                Connect your Facebook Page to schedule and publish posts
-              </p>
-              <button
-                onClick={() => handleConnectMeta('facebook')}
-                disabled={connecting}
-                style={{
-                  width: '100%',
-                  padding: '14px 28px',
-                  background: connecting ? 'rgba(255,255,255,0.2)' : 'linear-gradient(135deg, #1877F2 0%, #0D5FDB 100%)',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  cursor: connecting ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s',
-                  opacity: connecting ? 0.7 : 1
-                }}
-                onMouseEnter={(e) => {
-                  if (!connecting) {
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(24, 119, 242, 0.4)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!connecting) {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = 'none'
-                  }
-                }}
-              >
-                {connecting ? 'Connecting...' : 'Connect Facebook'}
-              </button>
-            </div>
+            Connect Social Accounts
+          </h1>
+          <p style={{ 
+            fontSize: '16px', 
+            color: 'rgba(255, 255, 255, 0.6)',
+            lineHeight: '1.6'
+          }}>
+            Connect your Meta account to schedule posts on Facebook and Instagram
+          </p>
+        </div>
 
-            {/* Instagram Connect */}
+        {/* Main Connect Card */}
+        <div style={{
+          background: 'rgba(0, 0, 0, 0.4)',
+          borderRadius: '28px',
+          padding: '40px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+          textAlign: 'center'
+        }}>
+          {/* Platform Icons */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            gap: '16px', 
+            marginBottom: '28px' 
+          }}>
             <div style={{
-              background: 'rgba(0, 0, 0, 0.4)',
-              borderRadius: '24px',
-              padding: '32px',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+              width: '64px',
+              height: '64px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, #1877F2 0%, #0D5FDB 100%)',
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              textAlign: 'center'
+              justifyContent: 'center',
+              color: '#fff',
+              boxShadow: '0 8px 24px rgba(24, 119, 242, 0.3)'
             }}>
-              <div style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '16px',
-                background: 'linear-gradient(135deg, #E4405F 0%, #C13584 50%, #833AB4 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '20px',
-                color: '#fff'
-              }}>
-                {getPlatformIcon('instagram')}
-              </div>
-              <h3 style={{ fontSize: '20px', fontWeight: '700', margin: '0 0 12px 0' }}>Instagram</h3>
-              <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', margin: '0 0 24px 0', lineHeight: '1.6' }}>
-                Connect your Instagram Business Account to schedule posts
-              </p>
-              <button
-                onClick={() => handleConnectMeta('instagram')}
-                disabled={connecting}
-                style={{
-                  width: '100%',
-                  padding: '14px 28px',
-                  background: connecting ? 'rgba(255,255,255,0.2)' : 'linear-gradient(135deg, #E4405F 0%, #C13584 50%, #833AB4 100%)',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  cursor: connecting ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s',
-                  opacity: connecting ? 0.7 : 1
-                }}
-                onMouseEnter={(e) => {
-                  if (!connecting) {
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(228, 64, 95, 0.4)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!connecting) {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = 'none'
-                  }
-                }}
-              >
-                {connecting ? 'Connecting...' : 'Connect Instagram'}
-              </button>
+              {getPlatformIcon('facebook')}
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              fontSize: '24px',
+              color: 'rgba(255,255,255,0.3)'
+            }}>
+              +
+            </div>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, #E4405F 0%, #C13584 50%, #833AB4 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              boxShadow: '0 8px 24px rgba(228, 64, 95, 0.3)'
+            }}>
+              {getPlatformIcon('instagram')}
             </div>
           </div>
 
-          {/* Connected Accounts */}
-          {connections.length > 0 && (
-            <div style={{ marginTop: '40px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '24px' }}>Connected Accounts</h2>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                gap: '20px'
-              }}>
-                {connections.map((connection) => (
-                  <div
-                    key={connection.id}
-                    style={{
-                      background: 'rgba(0, 0, 0, 0.4)',
-                      borderRadius: '20px',
-                      padding: '24px',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(20px)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <div style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '12px',
-                        background: connection.platform === 'facebook' 
-                          ? 'linear-gradient(135deg, #1877F2 0%, #0D5FDB 100%)'
-                          : 'linear-gradient(135deg, #E4405F 0%, #C13584 50%, #833AB4 100%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#fff'
-                      }}>
-                        {getPlatformIcon(connection.platform)}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>
-                          {connection.page_name || connection.instagram_username || connection.platform}
-                        </div>
-                        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', textTransform: 'capitalize' }}>
-                          {connection.platform}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDisconnect(connection.id)}
-                      style={{
-                        padding: '8px 16px',
-                        background: 'rgba(239, 68, 68, 0.2)',
-                        color: '#ef4444',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'
-                      }}
-                    >
-                      Disconnect
-                    </button>
-                  </div>
-                ))}
-              </div>
+          <h3 style={{ 
+            fontSize: '22px', 
+            fontWeight: '700', 
+            margin: '0 0 12px 0' 
+          }}>
+            Facebook & Instagram
+          </h3>
+          
+          <p style={{ 
+            fontSize: '14px', 
+            color: 'rgba(255,255,255,0.6)', 
+            margin: '0 0 28px 0', 
+            lineHeight: '1.7',
+            maxWidth: '360px',
+            marginLeft: 'auto',
+            marginRight: 'auto'
+          }}>
+            One connection gives you access to both platforms. Schedule and publish posts seamlessly.
+          </p>
+
+          {!isConnected ? (
+            <button
+              onClick={handleConnectMeta}
+              disabled={connecting}
+              style={{
+                width: '100%',
+                padding: '16px 32px',
+                background: connecting 
+                  ? 'rgba(255,255,255,0.2)' 
+                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '14px',
+                fontSize: '16px',
+                fontWeight: '700',
+                cursor: connecting ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s',
+                opacity: connecting ? 0.7 : 1,
+                boxShadow: connecting ? 'none' : '0 8px 24px rgba(102, 126, 234, 0.4)'
+              }}
+              onMouseEnter={(e) => {
+                if (!connecting) {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(102, 126, 234, 0.5)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!connecting) {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(102, 126, 234, 0.4)'
+                }
+              }}
+            >
+              {connecting ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                  <span style={{
+                    width: '18px',
+                    height: '18px',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTopColor: '#fff',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }}></span>
+                  Connecting...
+                </span>
+              ) : (
+                'Connect with Meta'
+              )}
+            </button>
+          ) : (
+            <div style={{
+              padding: '16px 24px',
+              background: 'rgba(72, 187, 120, 0.2)',
+              border: '1px solid rgba(72, 187, 120, 0.3)',
+              borderRadius: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px'
+            }}>
+              <span style={{ fontSize: '20px' }}>✓</span>
+              <span style={{ color: '#48bb78', fontWeight: '600' }}>Connected</span>
             </div>
           )}
         </div>
+
+        {/* Connected Accounts */}
+        {connections.length > 0 && (
+          <div style={{ marginTop: '32px' }}>
+            <h2 style={{ 
+              fontSize: '18px', 
+              fontWeight: '600', 
+              marginBottom: '16px',
+              color: 'rgba(255,255,255,0.8)'
+            }}>
+              Connected Accounts
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {connections.map((connection) => (
+                <div
+                  key={connection.id}
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    borderRadius: '16px',
+                    padding: '16px 20px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(10px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '10px',
+                      background: connection.platform === 'facebook' 
+                        ? 'linear-gradient(135deg, #1877F2 0%, #0D5FDB 100%)'
+                        : 'linear-gradient(135deg, #E4405F 0%, #C13584 50%, #833AB4 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff'
+                    }}>
+                      {getPlatformIcon(connection.platform)}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '2px' }}>
+                        {connection.page_name || connection.instagram_username || 'Connected'}
+                      </div>
+                      <div style={{ 
+                        fontSize: '12px', 
+                        color: 'rgba(255,255,255,0.5)', 
+                        textTransform: 'capitalize' 
+                      }}>
+                        {connection.platform}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDisconnect(connection.id)}
+                    style={{
+                      padding: '8px 14px',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      color: '#ef4444',
+                      border: '1px solid rgba(239, 68, 68, 0.25)',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'
+                    }}
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Info Note */}
+        <div style={{
+          marginTop: '32px',
+          padding: '16px 20px',
+          background: 'rgba(102, 126, 234, 0.1)',
+          border: '1px solid rgba(102, 126, 234, 0.2)',
+          borderRadius: '14px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '12px'
+        }}>
+          <span style={{ fontSize: '18px' }}>💡</span>
+          <p style={{ 
+            fontSize: '13px', 
+            color: 'rgba(255,255,255,0.7)', 
+            margin: 0,
+            lineHeight: '1.6'
+          }}>
+            You'll need a Facebook Page linked to your Instagram Business account. 
+            Personal Instagram accounts cannot be connected.
+          </p>
+        </div>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
 
 export default MetaConnectNovo
-
