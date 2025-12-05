@@ -1200,37 +1200,157 @@ const DressModelNovo: React.FC<DressModelNovoProps> = ({ onBack, initialModel, o
           }}>
             {loading ? (
               <div style={{ 
-                flex: 1,
+                width: '100%', 
+                height: '100%', 
+                minHeight: '400px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '30px 20px'
+                position: 'relative',
+                overflow: 'hidden',
+                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 50%, rgba(234, 102, 174, 0.1) 100%)'
               }}>
-                <div className="loader" style={{ 
-                  width: '40px', 
-                  height: '40px', 
-                  border: '3px solid rgba(102, 126, 234, 0.2)', 
-                  borderTopColor: '#667eea', 
-                  borderRadius: '50%', 
-                  animation: 'spin 1s linear infinite',
-                  marginBottom: '16px'
-                }}></div>
-                <p style={{ fontSize: '15px', fontWeight: '600', color: 'white', marginBottom: '6px' }}>Creating your look...</p>
-                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '16px' }}>This may take 15-60 seconds</p>
+                {/* Animated background gradient */}
                 <div style={{
-                  marginTop: '16px',
-                  padding: '12px 16px',
-                  background: 'rgba(102, 126, 234, 0.2)',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(102, 126, 234, 0.3)',
-                  display: 'inline-block'
-                }}>
-                  <p style={{ fontSize: '11px', color: '#667eea', margin: 0, fontWeight: '500' }}>
-                    ⏳ Please wait while we generate your fashion look...
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(45deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15), rgba(234, 102, 174, 0.15), rgba(102, 126, 234, 0.15))',
+                  backgroundSize: '400% 400%',
+                  animation: 'gradientShift 3s ease infinite'
+                }}></div>
+                
+                {/* Floating fashion elements */}
+                <div style={{ position: 'absolute', top: '10%', left: '15%', animation: 'float1 4s ease-in-out infinite', fontSize: '28px', opacity: 0.6 }}>✨</div>
+                <div style={{ position: 'absolute', top: '20%', right: '20%', animation: 'float2 5s ease-in-out infinite', fontSize: '24px', opacity: 0.5 }}>👗</div>
+                <div style={{ position: 'absolute', bottom: '25%', left: '10%', animation: 'float3 4.5s ease-in-out infinite', fontSize: '22px', opacity: 0.5 }}>💎</div>
+                <div style={{ position: 'absolute', bottom: '15%', right: '15%', animation: 'float1 5.5s ease-in-out infinite', fontSize: '26px', opacity: 0.6 }}>⭐</div>
+                <div style={{ position: 'absolute', top: '40%', left: '8%', animation: 'float2 4s ease-in-out infinite', fontSize: '20px', opacity: 0.4 }}>👠</div>
+                <div style={{ position: 'absolute', top: '35%', right: '8%', animation: 'float3 5s ease-in-out infinite', fontSize: '20px', opacity: 0.4 }}>👜</div>
+                <div style={{ position: 'absolute', bottom: '35%', left: '20%', animation: 'sparkle 2s ease-in-out infinite', fontSize: '16px', opacity: 0.7 }}>✦</div>
+                <div style={{ position: 'absolute', top: '15%', left: '40%', animation: 'sparkle 2.5s ease-in-out infinite 0.5s', fontSize: '14px', opacity: 0.6 }}>✦</div>
+                <div style={{ position: 'absolute', bottom: '20%', right: '35%', animation: 'sparkle 2s ease-in-out infinite 1s', fontSize: '18px', opacity: 0.7 }}>✦</div>
+                
+                {/* Main content */}
+                <div style={{ position: 'relative', zIndex: 10, textAlign: 'center' }}>
+                  {/* Pulsing fashion icon */}
+                  <div style={{
+                    width: '100px',
+                    height: '100px',
+                    margin: '0 auto 32px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    animation: 'pulse 2s ease-in-out infinite',
+                    boxShadow: '0 0 60px rgba(102, 126, 234, 0.4)',
+                    border: '2px solid rgba(255,255,255,0.1)'
+                  }}>
+                    <div style={{
+                      width: '70px',
+                      height: '70px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      animation: 'innerPulse 2s ease-in-out infinite 0.5s',
+                      boxShadow: '0 0 30px rgba(102, 126, 234, 0.6)'
+                    }}>
+                      <span style={{ fontSize: '32px', animation: 'iconBounce 1s ease-in-out infinite' }}>👗</span>
+                    </div>
+                  </div>
+                  
+                  {/* Masterbot Fashion branding */}
+                  <div style={{ 
+                    fontSize: '12px', 
+                    fontWeight: '600', 
+                    color: 'rgba(255,255,255,0.5)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '3px',
+                    marginBottom: '8px'
+                  }}>
+                    Masterbot Fashion
+                  </div>
+                  
+                  {/* Animated text */}
+                  <h2 style={{ 
+                    fontSize: '22px', 
+                    fontWeight: '700', 
+                    marginBottom: '16px',
+                    background: 'linear-gradient(90deg, #fff, #667eea, #764ba2, #ea66ae, #fff)',
+                    backgroundSize: '300% auto',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    animation: 'shimmer 3s linear infinite'
+                  }}>
+                    Dressing Your Model
+                  </h2>
+                  
+                  {/* Progress dots */}
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '24px' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#667eea', animation: 'dotPulse 1.5s ease-in-out infinite' }}></div>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#764ba2', animation: 'dotPulse 1.5s ease-in-out infinite 0.3s' }}></div>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ea66ae', animation: 'dotPulse 1.5s ease-in-out infinite 0.6s' }}></div>
+                  </div>
+                  
+                  {/* Time estimate */}
+                  <p style={{ 
+                    fontSize: '12px', 
+                    color: 'rgba(255,255,255,0.4)'
+                  }}>
+                    Usually takes 15-60 seconds
                   </p>
                 </div>
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                
+                {/* CSS Animations */}
+                <style>{`
+                  @keyframes gradientShift {
+                    0% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
+                  }
+                  @keyframes float1 {
+                    0%, 100% { transform: translateY(0) rotate(0deg); }
+                    50% { transform: translateY(-20px) rotate(10deg); }
+                  }
+                  @keyframes float2 {
+                    0%, 100% { transform: translateY(0) rotate(0deg); }
+                    50% { transform: translateY(-15px) rotate(-10deg); }
+                  }
+                  @keyframes float3 {
+                    0%, 100% { transform: translateY(0) scale(1); }
+                    50% { transform: translateY(-25px) scale(1.1); }
+                  }
+                  @keyframes sparkle {
+                    0%, 100% { opacity: 0.3; transform: scale(1); }
+                    50% { opacity: 1; transform: scale(1.3); }
+                  }
+                  @keyframes pulse {
+                    0%, 100% { transform: scale(1); box-shadow: 0 0 60px rgba(102, 126, 234, 0.4); }
+                    50% { transform: scale(1.05); box-shadow: 0 0 80px rgba(102, 126, 234, 0.6); }
+                  }
+                  @keyframes innerPulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.1); }
+                  }
+                  @keyframes iconBounce {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-5px); }
+                  }
+                  @keyframes shimmer {
+                    0% { background-position: -200% center; }
+                    100% { background-position: 200% center; }
+                  }
+                  @keyframes dotPulse {
+                    0%, 100% { transform: scale(1); opacity: 0.5; }
+                    50% { transform: scale(1.5); opacity: 1; }
+                  }
+                `}</style>
               </div>
             ) : (success || generatedImage) && generatedImage ? (
               <div style={{ 

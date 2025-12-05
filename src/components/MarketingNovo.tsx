@@ -2101,17 +2101,6 @@ Generate a professional, eye-catching ad image.`
                     {error && error.includes('Retrying') ? 'Retrying...' : 'Designing Your Ad'}
                   </h2>
                   
-                  {/* Rotating status messages */}
-                  <div style={{ 
-                    fontSize: '13px', 
-                    color: 'rgba(255,255,255,0.7)',
-                    marginBottom: '24px',
-                    minHeight: '20px'
-                  }}>
-                    <span style={{ animation: 'fadeInOut 4s ease-in-out infinite' }}>
-                      {error && error.includes('Retrying') ? 'Server is busy, please wait...' : '✨ AI is crafting your perfect ad...'}
-                    </span>
-                  </div>
                   
                   {/* Progress dots */}
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>

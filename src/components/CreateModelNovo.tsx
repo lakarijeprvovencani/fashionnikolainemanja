@@ -924,23 +924,177 @@ const CreateModelNovo: React.FC<CreateModelNovoProps> = ({ mode = 'ai', onBack, 
 
             {/* Right: Preview - Only for AI mode */}
             {mode === 'ai' && (
-              <div className="preview-section" style={{ 
-                background: 'rgba(0, 0, 0, 0.4)', 
-                borderRadius: '32px',
-                padding: '40px',
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-                minHeight: '400px'
-              }}>
-                <div style={{ textAlign: 'center', opacity: 0.5 }}>
-                  <div style={{ fontSize: '64px', marginBottom: '16px' }}>✨</div>
-                  <p style={{ fontSize: '16px', fontWeight: '600', color: 'rgba(255, 255, 255, 0.7)' }}>AI Preview will appear here</p>
-                </div>
+              <div 
+                key={loading ? 'loading' : 'idle'}
+                className="preview-section" 
+                style={{ 
+                  background: 'rgba(0, 0, 0, 0.4)', 
+                  borderRadius: '32px',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+                  minHeight: '400px',
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}
+              >
+                {loading ? (
+                  <div style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    minHeight: '400px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 50%, rgba(234, 102, 174, 0.1) 100%)'
+                  }}>
+                    {/* Animated background gradient */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'linear-gradient(45deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15), rgba(234, 102, 174, 0.15), rgba(102, 126, 234, 0.15))',
+                      backgroundSize: '400% 400%',
+                      animation: 'gradientShift 3s ease infinite'
+                    }}></div>
+                    
+                    {/* Floating elements */}
+                    <div style={{ position: 'absolute', top: '10%', left: '15%', animation: 'float1 4s ease-in-out infinite', fontSize: '28px', opacity: 0.6 }}>✨</div>
+                    <div style={{ position: 'absolute', top: '20%', right: '20%', animation: 'float2 5s ease-in-out infinite', fontSize: '24px', opacity: 0.5 }}>🎭</div>
+                    <div style={{ position: 'absolute', bottom: '25%', left: '10%', animation: 'float3 4.5s ease-in-out infinite', fontSize: '22px', opacity: 0.5 }}>💫</div>
+                    <div style={{ position: 'absolute', bottom: '15%', right: '15%', animation: 'float1 5.5s ease-in-out infinite', fontSize: '26px', opacity: 0.6 }}>⭐</div>
+                    <div style={{ position: 'absolute', top: '40%', left: '8%', animation: 'float2 4s ease-in-out infinite', fontSize: '20px', opacity: 0.4 }}>🌟</div>
+                    <div style={{ position: 'absolute', top: '35%', right: '8%', animation: 'float3 5s ease-in-out infinite', fontSize: '20px', opacity: 0.4 }}>✦</div>
+                    
+                    {/* Main content */}
+                    <div style={{ position: 'relative', zIndex: 10, textAlign: 'center' }}>
+                      {/* Pulsing icon */}
+                      <div style={{
+                        width: '100px',
+                        height: '100px',
+                        margin: '0 auto 32px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        animation: 'pulse 2s ease-in-out infinite',
+                        boxShadow: '0 0 60px rgba(102, 126, 234, 0.4)',
+                        border: '2px solid rgba(255,255,255,0.1)'
+                      }}>
+                        <div style={{
+                          width: '70px',
+                          height: '70px',
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          animation: 'innerPulse 2s ease-in-out infinite 0.5s',
+                          boxShadow: '0 0 30px rgba(102, 126, 234, 0.6)'
+                        }}>
+                          <span style={{ fontSize: '32px', animation: 'iconBounce 1s ease-in-out infinite' }}>🎭</span>
+                        </div>
+                      </div>
+                      
+                      {/* Masterbot Fashion branding */}
+                      <div style={{ 
+                        fontSize: '12px', 
+                        fontWeight: '600', 
+                        color: 'rgba(255,255,255,0.5)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '3px',
+                        marginBottom: '8px'
+                      }}>
+                        Masterbot Fashion
+                      </div>
+                      
+                      {/* Animated text */}
+                      <h2 style={{ 
+                        fontSize: '22px', 
+                        fontWeight: '700', 
+                        marginBottom: '16px',
+                        background: 'linear-gradient(90deg, #fff, #667eea, #764ba2, #ea66ae, #fff)',
+                        backgroundSize: '300% auto',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        animation: 'shimmer 3s linear infinite'
+                      }}>
+                        Creating Your Model
+                      </h2>
+                      
+                      {/* Progress dots */}
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '24px' }}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#667eea', animation: 'dotPulse 1.5s ease-in-out infinite' }}></div>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#764ba2', animation: 'dotPulse 1.5s ease-in-out infinite 0.3s' }}></div>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ea66ae', animation: 'dotPulse 1.5s ease-in-out infinite 0.6s' }}></div>
+                      </div>
+                      
+                      {/* Time estimate */}
+                      <p style={{ 
+                        fontSize: '12px', 
+                        color: 'rgba(255,255,255,0.4)'
+                      }}>
+                        Usually takes 30-90 seconds
+                      </p>
+                    </div>
+                    
+                    {/* CSS Animations */}
+                    <style>{`
+                      @keyframes gradientShift {
+                        0% { background-position: 0% 50%; }
+                        50% { background-position: 100% 50%; }
+                        100% { background-position: 0% 50%; }
+                      }
+                      @keyframes float1 {
+                        0%, 100% { transform: translateY(0) rotate(0deg); }
+                        50% { transform: translateY(-20px) rotate(10deg); }
+                      }
+                      @keyframes float2 {
+                        0%, 100% { transform: translateY(0) rotate(0deg); }
+                        50% { transform: translateY(-15px) rotate(-10deg); }
+                      }
+                      @keyframes float3 {
+                        0%, 100% { transform: translateY(0) scale(1); }
+                        50% { transform: translateY(-25px) scale(1.1); }
+                      }
+                      @keyframes pulse {
+                        0%, 100% { transform: scale(1); box-shadow: 0 0 60px rgba(102, 126, 234, 0.4); }
+                        50% { transform: scale(1.05); box-shadow: 0 0 80px rgba(102, 126, 234, 0.6); }
+                      }
+                      @keyframes innerPulse {
+                        0%, 100% { transform: scale(1); }
+                        50% { transform: scale(1.1); }
+                      }
+                      @keyframes iconBounce {
+                        0%, 100% { transform: translateY(0); }
+                        50% { transform: translateY(-5px); }
+                      }
+                      @keyframes shimmer {
+                        0% { background-position: -200% center; }
+                        100% { background-position: 200% center; }
+                      }
+                      @keyframes dotPulse {
+                        0%, 100% { transform: scale(1); opacity: 0.5; }
+                        50% { transform: scale(1.5); opacity: 1; }
+                      }
+                    `}</style>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', opacity: 0.5, padding: '40px' }}>
+                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>✨</div>
+                    <p style={{ fontSize: '16px', fontWeight: '600', color: 'rgba(255, 255, 255, 0.7)' }}>AI Preview will appear here</p>
+                  </div>
+                )}
               </div>
             )}
           </div>

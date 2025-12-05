@@ -35,18 +35,22 @@ const TokenCounter: React.FC<TokenCounterProps> = ({ onRefresh }) => {
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) {
-      return `${(num / 1000000).toFixed(1)}M`
+      const millions = num / 1000000
+      if (millions % 1 === 0) {
+        return `${millions.toFixed(0)}M`
+      }
+      return `${millions.toFixed(2)}M`
     }
-    // Only use K for numbers >= 10,000
-    if (num >= 10000) {
+    if (num >= 1000) {
       const thousands = num / 1000
-      // Clean decimal if it's a round number
+      // Round number - no decimals needed
       if (thousands % 1 === 0) {
         return `${thousands.toFixed(0)}K`
       }
-      return `${thousands.toFixed(1)}K`
+      // Always show 2 decimal places to avoid rounding issues
+      // e.g., 99.992 should show as 99.99K, not 100.0K
+      return `${thousands.toFixed(2)}K`
     }
-    // For numbers < 10,000, show full number with comma separator
     return num.toLocaleString()
   }
 

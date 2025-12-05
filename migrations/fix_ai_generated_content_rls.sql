@@ -44,3 +44,4 @@ FROM pg_tables
 WHERE tablename = 'ai_generated_content';
 
 
+
